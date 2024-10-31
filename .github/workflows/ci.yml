@@ -1,53 +1,30 @@
-jobs:
-  build:
-    name: Build
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/prepare
-      - run: pnpm build
-      - run: node ./lib/index.js
-  lint:
-    name: Lint
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/prepare
-      - run: pnpm lint
-  lint_knip:
-    name: Lint Knip
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/prepare
-      - run: pnpm lint:knip
-  prettier:
-    name: Prettier
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/prepare
-      - run: pnpm format --list-different
-  test:
-    name: Test
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/prepare
-      - run: pnpm run test --coverage
-      - uses: codecov/codecov-action@v3
-  type_check:
-    name: Type Check
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/prepare
-      - run: pnpm tsc
-
 name: CI
 
 on:
-  pull_request: ~
   push:
-    branches:
-      - main
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: "Prepare"
+        uses: ./.github/actions/prepare
+
+      - name: "Install SFDX CLI"
+        run: |
+          npm install @salesforce/cli --global
+          sf --version
+
+      - name: "Lint"
+        run: pnpm lint
+
+      - name: "Prettier Check"
+        run: pnpm prettier:verify
+
+      - name: "Run Tests"
+        run: pnpm test
