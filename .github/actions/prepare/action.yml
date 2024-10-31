@@ -2,15 +2,31 @@ description: Prepares the repo for a typical CI job
 
 name: Prepare
 
-runs:
-  steps:
-    - uses: pnpm/action-setup@v4
-      with:
-        version: 9
-    - uses: actions/setup-node@v4
-      with:
-        cache: pnpm
-        node-version: "20"
-    - run: pnpm install --frozen-lockfile
-      shell: bash
-  using: composite
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: "Prepare"
+        uses: ./.github/actions/prepare
+
+      - name: "Install SFDX CLI"
+        run: |
+          npm install @salesforce/cli --global
+          sf --version
+
+      - name: "Lint"
+        run: pnpm lint
+
+      - name: "Prettier Check"
+        run: pnpm prettier:verify
+
+      - name: "Run Tests"
+        run: pnpm test
