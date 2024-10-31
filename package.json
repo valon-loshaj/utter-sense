@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "description": "Salesforce App",
   "scripts": {
-    "lint": "eslint **/{aura,lwc}/**/*.js",
+    "lint": "[ -d \"force-app/main/default/lwc\" ] && eslint \"**/lwc/**/*.js\" \"**/aura/**/*.js\" || echo \"No LWC/Aura files to lint\"",
     "test": "npm run test:unit",
     "test:unit": "sfdx-lwc-jest",
     "test:unit:watch": "sfdx-lwc-jest --watch",
