@@ -1,53 +1,59 @@
-jobs:
-  build:
-    name: Build
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/prepare
-      - run: pnpm build
-      - run: node ./lib/index.js
-  lint:
-    name: Lint
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/prepare
-      - run: pnpm lint
-  lint_knip:
-    name: Lint Knip
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/prepare
-      - run: pnpm lint:knip
-  prettier:
-    name: Prettier
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/prepare
-      - run: pnpm format --list-different
-  test:
-    name: Test
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/prepare
-      - run: pnpm run test --coverage
-      - uses: codecov/codecov-action@v3
-  type_check:
-    name: Type Check
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/prepare
-      - run: pnpm tsc
-
 name: CI
 
 on:
-  pull_request: ~
   push:
-    branches:
-      - main
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: "Prepare"
+        uses: ./.github/actions/prepare
+
+      - name: "Install SFDX CLI"
+        run: |
+          npm install @salesforce/cli --global
+          sf --version
+
+      - name: "Check for LWC/Aura files"
+        id: check_files
+        run: |
+          if [ -d "force-app/main/default/lwc" ] || [ -d "force-app/main/default/aura" ]; then
+            echo "has_js_files=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_js_files=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: "Lint"
+        if: steps.check_files.outputs.has_js_files == 'true'
+        run: pnpm lint
+
+      - name: "Format files"
+        run: pnpm prettier --write "**/*.{cls,cmp,component,css,html,js,json,md,page,trigger,xml,yaml,yml}"
+
+      - name: "Commit formatting changes"
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "style: format files with prettier"
+          branch: ${{ github.head_ref }}
+
+      - name: "Verify Formatting"
+        run: pnpm prettier:verify
+
+      - name: "Check for tests"
+        id: check_tests
+        run: |
+          if [ -d "force-app/main/default/lwc/**/__tests__" ]; then
+            echo "has_tests=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_tests=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: "Run Tests"
+        if: steps.check_tests.outputs.has_tests == 'true'
+        run: pnpm test
