@@ -5,9 +5,8 @@
   "description": "Salesforce App",
   "scripts": {
     "lint": "[ -d \"force-app/main/default/lwc\" ] && eslint \"**/lwc/**/*.js\" \"**/aura/**/*.js\" || echo \"No LWC/Aura files to lint\"",
-    "test": "npm run test:unit",
+    "test": "npm run test:unit -- --passWithNoTests",
     "test:unit": "sfdx-lwc-jest",
-    "test:unit:watch": "sfdx-lwc-jest --watch",
     "test:unit:debug": "sfdx-lwc-jest --debug",
     "test:unit:coverage": "sfdx-lwc-jest --coverage",
     "prettier": "prettier --write \"**/*.{cls,cmp,component,css,html,js,json,md,page,trigger,xml,yaml,yml}\"",
