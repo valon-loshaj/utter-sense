@@ -20,6 +20,7 @@
 ```shell
 npm i side-quest
 ```
+
 ```ts
 import { greet } from "side-quest";
 
@@ -27,6 +28,7 @@ greet("Hello, world! 💖");
 ```
 
 ## Contributors
+
 <!-- spellchecker: disable -->
 <!-- ALL-CONTRIBUTORS-LIST:START - Do not remove or modify this section -->
 <!-- prettier-ignore-start -->
