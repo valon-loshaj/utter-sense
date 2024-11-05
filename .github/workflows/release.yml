@@ -1,3 +1,14 @@
+name: Salesforce Release
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+  id-token: write
+
 concurrency:
   group: ${{ github.workflow }}
 
@@ -9,20 +20,38 @@ jobs:
         with:
           fetch-depth: 0
           ref: main
-      - uses: ./.github/actions/prepare
-      - run: pnpm build
-      - env:
+
+      # Set up SFDX CLI
+      - name: Install Salesforce CLI
+        run: |
+          wget https://developer.salesforce.com/media/salesforce-cli/sfdx/channels/stable/sfdx-linux-x64.tar.xz
+          mkdir ~/sfdx
+          tar xJf sfdx-linux-x64.tar.xz -C ~/sfdx --strip-components 1
+          echo "$HOME/sfdx/bin" >> $GITHUB_PATH
+          ~/sfdx/bin/sfdx --version
+
+      # Authenticate with Salesforce
+      - name: Authenticate with Salesforce
+        run: |
+          echo "${{ secrets.SFDX_AUTH_URL }}" > ./SFDX_AUTH_URL.txt
+          sfdx auth:sfdxurl:store -f ./SFDX_AUTH_URL.txt -s -a production
+
+      # Run tests
+      - name: Run Apex Tests
+        run: sfdx force:apex:test:run -l RunLocalTests -w 30 -c -r human
+
+      # Deploy to production
+      - name: Deploy to Production
+        run: |
+          sfdx force:source:deploy -p force-app/main/default -l RunLocalTests -w 30
+
+      # Create GitHub Release
+      - name: Create Release
+        env:
           GITHUB_TOKEN: ${{ secrets.ACCESS_TOKEN }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-        uses: JoshuaKGoldberg/release-it-action@v0.2.2
-
-name: Release
-
-on:
-  push:
-    branches:
-      - main
-
-permissions:
-  contents: write
-  id-token: write
+        uses: actions/create-release@v1
+        with:
+          tag_name: v${{ github.run_number }}
+          release_name: Release v${{ github.run_number }}
+          draft: false
+          prerelease: false
