@@ -3,7 +3,7 @@
 After [forking the repo from GitHub](https://help.github.com/articles/fork-a-repo) and [installing pnpm](https://pnpm.io/installation):
 
 ```shell
-git clone https://github.com/<your-name-here>/side-quest
+git clone https://github.com/ < your-name-here > /side-quest
 cd side-quest
 pnpm install
 ```
