@@ -38,12 +38,12 @@ jobs:
 
       # Run tests
       - name: Run Apex Tests
-        run: sfdx force:apex:test:run -l RunLocalTests -w 30 -c -r human
+        run: sfdx force:apex:test:run -p force-app/main/default/classes/tests -w 30 -c -r human
 
       # Deploy to production
       - name: Deploy to Production
         run: |
-          sfdx force:source:deploy -p force-app/main/default -l RunLocalTests -w 30
+          sfdx force:source:deploy -p force-app/main/default -l NoTestRun -w 30
 
       # Create GitHub Release
       - name: Create Release

@@ -1,10 +1,25 @@
 {
-  "$schema": "http://json.schemastore.org/prettierrc",
-  "overrides": [{ "files": ".nvmrc", "options": { "parser": "yaml" } }],
-  "plugins": [
-    "prettier-plugin-curly",
-    "prettier-plugin-sh",
-    "prettier-plugin-packagejson"
-  ],
-  "useTabs": true
+	"$schema": "http://json.schemastore.org/prettierrc",
+	"useTabs": true,
+	"trailingComma": "none",
+	"plugins": [
+		"prettier-plugin-sh",
+		"prettier-plugin-packagejson",
+		"prettier-plugin-apex",
+		"@prettier/plugin-xml"
+	],
+	"overrides": [
+		{
+			"files": ".nvmrc",
+			"options": { "parser": "yaml" }
+		},
+		{
+			"files": "**/lwc/**/*.html",
+			"options": { "parser": "lwc" }
+		},
+		{
+			"files": "*.{cmp,page,component}",
+			"options": { "parser": "html" }
+		}
+	]
 }

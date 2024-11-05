@@ -1,0 +1,33 @@
+<template>
+	<div class="slds-card">
+		<!-- Added header section -->
+		<div class="slds-card__header slds-grid">
+			<header class="slds-media slds-media_center">
+				<div class="slds-media__body">
+					<h2 class="slds-card__header-title">
+						<span class="slds-text-heading_medium"
+							>Article Recommendations</span
+						>
+					</h2>
+				</div>
+			</header>
+		</div>
+
+		<div class="slds-card__body">
+			<!-- Loop through recommended articles and create child components -->
+			<template if:true={recommendedArticles}>
+				<template for:each={recommendedArticles} for:item="article">
+					<c-utter-sense-knowledge-article key={article.Id} article={article}>
+					</c-utter-sense-knowledge-article>
+				</template>
+			</template>
+
+			<!-- Show message if no articles are found -->
+			<template if:false={recommendedArticles}>
+				<div class="slds-text-align_center slds-p-around_medium">
+					No recommended articles found.
+				</div>
+			</template>
+		</div>
+	</div>
+</template>
