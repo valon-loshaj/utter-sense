@@ -1,30 +1,85 @@
-import { LightningElement } from "lwc";
+import { LightningElement, track } from "lwc";
+import getKnowledgeArticles from "@salesforce/apex/UtterSenseKnowledgeRecController.getKnowledgeArticles";
 
 export default class UtterSenseKnowledgeRecommendation extends LightningElement {
-	recommendedArticles = [
-		{
-			Id: "1",
-			Title: "Tesla Model 3: Features and Specifications",
-			Summary:
-				"Comprehensive guide to Tesla Model 3 features including range (358 miles), acceleration (0-60 mph in 3.1s), and advanced autopilot capabilities. Learn about the all-electric sedan's interior features and charging options."
-		},
-		{
-			Id: "2",
-			Title: "Tesla Model Y: The Ultimate Electric SUV",
-			Summary:
-				"Detailed overview of Tesla Model Y, the compact SUV offering up to 330 miles of range. Discover its spacious interior, dual-motor AWD system, and advanced safety features."
-		},
-		{
-			Id: "3",
-			Title: "Tesla Model S Plaid: Breaking Speed Records",
-			Summary:
-				"Explore the groundbreaking performance of Tesla Model S Plaid, featuring tri-motor setup, 1,020 horsepower, and 0-60 mph in just 1.99 seconds. Learn about its revolutionary battery technology and luxury features."
-		},
-		{
-			Id: "4",
-			Title: "Tesla Cybertruck: The Future of Electric Trucks",
-			Summary:
-				"Everything you need to know about the upcoming Tesla Cybertruck, including its unique design, ultra-hard 30X cold-rolled stainless steel body, and impressive towing capacity of up to 14,000 pounds."
+	@track recommendedArticles = [];
+	@track isLoading = false;
+	searchString = "Tesla";
+
+	connectedCallback() {
+		this.subscribeToVoiceToolkit();
+	}
+
+	disconnectedCallback() {
+		this.unsubscribeFromVoiceToolkit();
+	}
+
+	subscribeToVoiceToolkit() {
+		const toolkitApi = this.template.querySelector(
+			"lightning-service-cloud-voice-toolkit-api"
+		);
+		if (toolkitApi) {
+			toolkitApi.addEventListener(
+				"callstarted",
+				this.handleCallStarted.bind(this)
+			);
+			toolkitApi.addEventListener(
+				"transcript",
+				this.handleTranscript.bind(this)
+			);
+			toolkitApi.addEventListener("callended", this.handleCallEnded.bind(this));
 		}
-	];
+	}
+
+	unsubscribeFromVoiceToolkit() {
+		const toolkitApi = this.template.querySelector(
+			"lightning-service-cloud-voice-toolkit-api"
+		);
+		if (toolkitApi) {
+			toolkitApi.removeEventListener(
+				"callstarted",
+				this.handleCallStarted.bind(this)
+			);
+			toolkitApi.removeEventListener(
+				"transcript",
+				this.handleTranscript.bind(this)
+			);
+			toolkitApi.removeEventListener(
+				"callended",
+				this.handleCallEnded.bind(this)
+			);
+		}
+	}
+
+	handleCallStarted(event) {
+		console.log("Call started:", event.detail);
+		this.isLoading = true;
+	}
+
+	handleTranscript(event) {
+		if (event.detail && event.detail.text) {
+			this.searchString = event.detail.text;
+			this.fetchKnowledgeArticles();
+		}
+	}
+
+	handleCallEnded(event) {
+		console.log("Call ended:", event.detail);
+		this.isLoading = false;
+		this.recommendedArticles = [];
+	}
+
+	async fetchKnowledgeArticles() {
+		this.isLoading = true;
+		try {
+			const result = await getKnowledgeArticles({
+				searchString: this.searchString
+			});
+			this.recommendedArticles = result;
+		} catch (error) {
+			console.error("Error fetching knowledge articles:", error);
+		} finally {
+			this.isLoading = false;
+		}
+	}
 }

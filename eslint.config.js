@@ -15,7 +15,8 @@ module.exports = [
 			globals: {
 				// Add any global variables used in LWC
 				$: true,
-				require: true
+				require: true,
+				console: true
 			},
 			parser: require("@babel/eslint-parser"),
 			parserOptions: {

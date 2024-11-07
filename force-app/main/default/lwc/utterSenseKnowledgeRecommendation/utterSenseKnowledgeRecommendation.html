@@ -1,4 +1,10 @@
 <template>
+	<!-- 
+	This component is used to integrate the Service Cloud Voice Toolkit API, 
+	which provides functionalities for handling voice calls within the Salesforce Service Cloud.
+	-->
+	<lightning-service-cloud-voice-toolkit-api>
+	</lightning-service-cloud-voice-toolkit-api>
 	<div class="slds-card">
 		<!-- Added header section -->
 		<div class="slds-card__header slds-grid">
@@ -14,6 +20,17 @@
 		</div>
 
 		<div class="slds-card__body">
+			<!-- Show loading spinner when loading -->
+			<template if:true={isLoading}>
+				<div class="slds-spinner slds-spinner_medium slds-spinner_brand">
+					<div class="slds-spinner__dot-a"></div>
+					<div class="slds-spinner__dot-b"></div>
+				</div>
+				<div class="slds-text-align_center slds-p-around_medium">
+					Loading articles...
+				</div>
+			</template>
+
 			<!-- Loop through recommended articles and create child components -->
 			<template if:true={recommendedArticles}>
 				<template for:each={recommendedArticles} for:item="article">
