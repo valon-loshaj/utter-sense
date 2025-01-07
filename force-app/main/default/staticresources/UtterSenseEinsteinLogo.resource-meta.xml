@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<StaticResource xmlns="http://soap.sforce.com/2006/04/metadata">
+    <cacheControl>Public</cacheControl>
+    <contentType>image/webp</contentType>
+    <description
+	>placeholder logo that appears on the utter sense component prior to article search.</description>
+</StaticResource>

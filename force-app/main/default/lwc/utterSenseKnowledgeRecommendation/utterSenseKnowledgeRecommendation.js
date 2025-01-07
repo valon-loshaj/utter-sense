@@ -1,85 +1,73 @@
 import { LightningElement, track } from "lwc";
 import getKnowledgeArticles from "@salesforce/apex/UtterSenseKnowledgeRecController.getKnowledgeArticles";
+import EINSTEIN_LOGO from "@salesforce/resourceUrl/UtterSenseEinsteinLogo";
 
 export default class UtterSenseKnowledgeRecommendation extends LightningElement {
-	@track recommendedArticles = [];
+	@track recommendedArticles;
 	@track isLoading = false;
-	searchString = "Tesla";
+	@track searchTerm = "";
+	einsteinLogoUrl = EINSTEIN_LOGO;
 
-	connectedCallback() {
-		this.subscribeToVoiceToolkit();
+	// New properties for placeholder handling
+	get showPlaceholder() {
+		return !this.isLoading && !this.searchTerm && !this.recommendedArticles;
 	}
 
-	disconnectedCallback() {
-		this.unsubscribeFromVoiceToolkit();
-	}
-
-	subscribeToVoiceToolkit() {
-		const toolkitApi = this.template.querySelector(
-			"lightning-service-cloud-voice-toolkit-api"
+	get noArticlesFound() {
+		return (
+			!this.isLoading &&
+			this.searchTerm &&
+			(!this.recommendedArticles || this.recommendedArticles.length === 0)
 		);
-		if (toolkitApi) {
-			toolkitApi.addEventListener(
-				"callstarted",
-				this.handleCallStarted.bind(this)
-			);
-			toolkitApi.addEventListener(
-				"transcript",
-				this.handleTranscript.bind(this)
-			);
-			toolkitApi.addEventListener("callended", this.handleCallEnded.bind(this));
+	}
+
+	// Handle search input changes
+	handleSearchChange(event) {
+		const searchTerm = event.target.value;
+		this.searchTerm = searchTerm;
+
+		// If search term is empty, clear results
+		if (!searchTerm) {
+			this.recommendedArticles = null;
+			return;
 		}
+
+		// Debounce the search to avoid too many API calls
+		this.debounceSearch(searchTerm);
 	}
 
-	unsubscribeFromVoiceToolkit() {
-		const toolkitApi = this.template.querySelector(
-			"lightning-service-cloud-voice-toolkit-api"
-		);
-		if (toolkitApi) {
-			toolkitApi.removeEventListener(
-				"callstarted",
-				this.handleCallStarted.bind(this)
-			);
-			toolkitApi.removeEventListener(
-				"transcript",
-				this.handleTranscript.bind(this)
-			);
-			toolkitApi.removeEventListener(
-				"callended",
-				this.handleCallEnded.bind(this)
-			);
+	// Debounce helper
+	debounceSearch(searchTerm) {
+		// Clear any existing timeout
+		if (this.delayTimeout) {
+			clearTimeout(this.delayTimeout);
 		}
+
+		// Set a new timeout
+		// eslint-disable-next-line @lwc/lwc/no-async-operation
+		this.delayTimeout = setTimeout(() => {
+			this.searchArticles(searchTerm);
+		}, 300); // Wait 300ms after last keystroke before searching
 	}
 
-	handleCallStarted(event) {
-		console.log("Call started:", event.detail);
-		this.isLoading = true;
-	}
-
-	handleTranscript(event) {
-		if (event.detail && event.detail.text) {
-			this.searchString = event.detail.text;
-			this.fetchKnowledgeArticles();
-		}
-	}
-
-	handleCallEnded(event) {
-		console.log("Call ended:", event.detail);
-		this.isLoading = false;
-		this.recommendedArticles = [];
-	}
-
-	async fetchKnowledgeArticles() {
+	// Search articles using the Apex controller
+	async searchArticles(searchTerm) {
 		this.isLoading = true;
 		try {
-			const result = await getKnowledgeArticles({
-				searchString: this.searchString
-			});
-			this.recommendedArticles = result;
+			const results = await getKnowledgeArticles({ searchTerm });
+			this.recommendedArticles = results;
 		} catch (error) {
-			console.error("Error fetching knowledge articles:", error);
+			console.error("Error searching articles:", error);
+			this.recommendedArticles = null;
 		} finally {
 			this.isLoading = false;
+		}
+	}
+
+	// Clean up when component is removed
+	disconnectedCallback() {
+		if (this.delayTimeout) {
+			clearTimeout(this.delayTimeout);
 		}
 	}
 }

@@ -1,0 +1,9 @@
+This application is a Salesforce application, using lightning web components for front-end components and apex for the back-end programming language.
+
+When generating code, make sure to provide concise and clear comments. When generating code for lightning web components, please make sure to use class components as specified by the OSS lightning web components library.
+
+I use pnpm as my preferred pacakge maanger, keep this in mind when referencing anything related to managing packges within my projects.
+
+The main directory for this application is the force-app directory found in the root of the project.
+
+When working with JavaScript modules, I prefer to use modern ES Modules and not Common JS. If there is an instance where Common JS is required, I'd like you to explicitly call that out and explain the considerations.

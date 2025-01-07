@@ -2,3 +2,14 @@
 .slds-card {
 	background: #ffffff;
 }
+
+.einstein-logo {
+	width: 24px;
+	height: 24px;
+	object-fit: contain;
+}
+
+.einstein-logo-large {
+	width: 84px;
+	height: 84px;
+}
