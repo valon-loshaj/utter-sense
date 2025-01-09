@@ -4,12 +4,17 @@
 }
 
 .einstein-logo {
-	width: 24px;
-	height: 24px;
-	object-fit: contain;
+	width: 64px;
+	height: 64px;
+	margin: 0 auto;
 }
 
 .einstein-logo-large {
 	width: 84px;
 	height: 84px;
+}
+
+.slds-box {
+	background-color: #ffffff;
+	border-radius: 4px;
 }

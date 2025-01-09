@@ -1,34 +1,50 @@
 import { LightningElement, track } from "lwc";
-import getKnowledgeArticles from "@salesforce/apex/UtterSenseKnowledgeRecController.getKnowledgeArticles";
+import getRecommendedResponse from "@salesforce/apex/UtterSenseKnowledgeRecController.getRecommendedResponse";
 import EINSTEIN_LOGO from "@salesforce/resourceUrl/UtterSenseEinsteinLogo";
 
 export default class UtterSenseKnowledgeRecommendation extends LightningElement {
-	@track recommendedArticles;
+	@track response;
 	@track isLoading = false;
 	@track searchTerm = "";
+	@track error;
 	einsteinLogoUrl = EINSTEIN_LOGO;
 
 	// New properties for placeholder handling
 	get showPlaceholder() {
-		return !this.isLoading && !this.searchTerm && !this.recommendedArticles;
+		return !this.isLoading && !this.searchTerm && !this.response;
 	}
 
-	get noArticlesFound() {
+	get noResponseReceived() {
 		return (
 			!this.isLoading &&
 			this.searchTerm &&
-			(!this.recommendedArticles || this.recommendedArticles.length === 0)
+			(!this.response || !this.response.promptResponse)
 		);
+	}
+
+	get formattedResponse() {
+		if (!this.response || !this.response.promptResponse) {
+			return null;
+		}
+		// Convert response text to HTML with line breaks
+		return this.response.promptResponse
+			.split("\n")
+			.map((line) => {
+				// You might want to add additional formatting here
+				return line.trim();
+			})
+			.filter((line) => line.length > 0);
 	}
 
 	// Handle search input changes
 	handleSearchChange(event) {
 		const searchTerm = event.target.value;
 		this.searchTerm = searchTerm;
+		this.error = null;
 
 		// If search term is empty, clear results
 		if (!searchTerm) {
-			this.recommendedArticles = null;
+			this.response = null;
 			return;
 		}
 
@@ -53,12 +69,19 @@ export default class UtterSenseKnowledgeRecommendation extends LightningElement 
 	// Search articles using the Apex controller
 	async searchArticles(searchTerm) {
 		this.isLoading = true;
+		this.error = null;
+
 		try {
-			const results = await getKnowledgeArticles({ searchTerm });
-			this.recommendedArticles = results;
+			const result = await getRecommendedResponse({ searchString: searchTerm });
+			this.response = result;
+
+			if (!result || !result.promptResponse) {
+				throw new Error("No response received from the prompt template");
+			}
 		} catch (error) {
-			console.error("Error searching articles:", error);
-			this.recommendedArticles = null;
+			console.error("Error getting response:", error);
+			this.error = error.message || "An unexpected error occurred";
+			this.response = null;
 		} finally {
 			this.isLoading = false;
 		}

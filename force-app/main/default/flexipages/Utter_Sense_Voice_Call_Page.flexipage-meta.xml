@@ -118,6 +118,12 @@
         <type>Region</type>
     </flexiPageRegions>
     <flexiPageRegions>
+        <itemInstances>
+            <componentInstance>
+                <componentName>utterSenseKnowledgeRecommendation</componentName>
+                <identifier>c_utterSenseKnowledgeRecommendation</identifier>
+            </componentInstance>
+        </itemInstances>
         <mode>Replace</mode>
         <name>sidebar</name>
         <type>Region</type>

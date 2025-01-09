@@ -5,6 +5,7 @@
 	<capabilities>
 		<capability>lightning__ServiceCloudVoiceToolkitApi</capability>
 	</capabilities>
+	<masterLabel>Utter Sense Knowledge Recommendation</masterLabel>
 	<targets>
 		<target>lightning__RecordPage</target>
 	</targets>

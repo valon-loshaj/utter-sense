@@ -1,82 +1,43 @@
 public with sharing class UtterSenseKnowledgeRecController {
 	@AuraEnabled
-	public static List<Knowledge__kav> getKnowledgeArticles(String searchString) {
+	public static String getRecommendedResponse(String searchString) {
 		try {
-			if (String.isBlank(searchString)) {
-				return new List<Knowledge__kav>();
-			}
+			// Create generate text request
+			aiplatform.ModelsAPI.createGenerations_Request request = new aiplatform.ModelsAPI.createGenerations_Request();
 
-			// Escape special characters in search string
-			searchString = String.escapeSingleQuotes(searchString);
+			// Specify model
+			request.modelName = 'sfdc_ai__DefaultOpenAIGPT4OmniMini';
 
-			// Build Data Cloud Query
-			String dataCloudQuery =
-				'SELECT Id, Title, Summary, UrlName, ArticleNumber, LastPublishedDate ' +
-				'FROM ssot__KnowledgeArticle__dlm ' +
-				'WHERE Title LIKE \'%' +
-				searchString +
-				'%\' ' +
-				'OR Summary LIKE \'%' +
-				searchString +
-				'%\' ' +
-				'AND PublishStatus = \'Online\' ' +
-				'AND Language = \'en_US\' ' +
-				'ORDER BY LastPublishedDate DESC ' +
-				'LIMIT 5';
+			// Create request body
+			aiplatform.ModelsAPI_GenerationRequest requestBody = new aiplatform.ModelsAPI_GenerationRequest();
+			request.body = requestBody;
 
-			// Make HTTP callout to Data Cloud Query API
-			Http http = new Http();
-			HttpRequest request = new HttpRequest();
-			request.setEndpoint('callout:DataCloudAPI/api/v2/query');
-			request.setMethod('POST');
-			request.setHeader('Content-Type', 'application/json');
+			// Add prompt to body
+			requestBody.prompt = 'Generate a welcome email for the new developer on the team, Jane Doe.';
 
-			// Construct the request body
-			Map<String, Object> requestBody = new Map<String, Object>{
-				'sql' => dataCloudQuery,
-				'options' => new Map<String, Object>{ 'limit' => 5 }
-			};
-
-			request.setBody(JSON.serialize(requestBody));
-
-			// Send the request
-			HttpResponse response = http.send(request);
-
-			if (response.getStatusCode() == 200) {
-				// Parse the response and convert to Knowledge__kav records
-				Map<String, Object> responseBody = (Map<String, Object>) JSON.deserializeUntyped(
-					response.getBody()
+			try {
+				// Make request
+				aiplatform.ModelsAPI modelsAPI = new aiplatform.ModelsAPI();
+				aiplatform.ModelsAPI.createGenerations_Response response = modelsAPI.createGenerations(
+					request
 				);
-				List<Object> data = (List<Object>) responseBody.get('data');
+				System.debug(
+					'Models API response: ' + response.Code200.generation.generatedText
+				);
 
-				List<Knowledge__kav> articles = new List<Knowledge__kav>();
-				for (Object record : data) {
-					Map<String, Object> fields = (Map<String, Object>) record;
-					Knowledge__kav article = new Knowledge__kav(
-						Id = (String) fields.get('Id'),
-						Title = (String) fields.get('Title'),
-						Summary = (String) fields.get('Summary'),
-						UrlName = (String) fields.get('UrlName')
-					);
-					articles.add(article);
+				// Check if we got a valid response
+				if (response != null) {
+					// Return the generated text from the first generation
+					return response;
 				}
-				return articles;
-			}
 
-			throw new AuraHandledException(
-				'Error querying Data Cloud: ' +
-					response.getStatusCode() +
-					' ' +
-					response.getStatus()
-			);
-		} catch (Exception e) {
-			System.debug(
-				LoggingLevel.ERROR,
-				'Error in getKnowledgeArticles: ' + e.getMessage()
-			);
-			throw new AuraHandledException(
-				'Error retrieving knowledge articles: ' + e.getMessage()
-			);
+				throw new AuraHandledException('No response generated from the model');
+
+				// Handle error
+			} catch (aiplatform.ModelsAPI.createGenerations_ResponseException e) {
+				System.debug('Response code: ' + e.responseCode);
+				System.debug('The following exception occurred: ' + e);
+			}
 		}
 	}
 }
