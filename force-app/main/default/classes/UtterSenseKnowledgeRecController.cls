@@ -24,19 +24,34 @@ public with sharing class UtterSenseKnowledgeRecController {
 			wrapperData.generatedText = response.Code200.generation.generatedText;
 			System.debug('Value of response: ' + JSON.serializePretty(response));
 		} catch (aiplatform.ModelsAPI.createGenerations_ResponseException e) {
-			ExceptionLog__c ex = new ExceptionLog__c(
-				ExceptionDescription__c = e.getMessage()
-			);
-			insert ex;
+			System.debug('Error: ' + e.getMessage());
 		}
 		return wrapperData.generatedText;
 	}
 
 	public static ResponseWrapper preparePromptContent(String searchString) {
-		String promptContent = 'Utter_Sense_FAQ: ' + searchString;
-		ResponseWrapper response = new ResponseWrapper();
-		response.promptContent = promptContent;
-		return response;
+		Map<String, String> property = new Map<String, String>();
+		property.put('query', searchString);
+		ConnectApi.WrappedValue propertyValue = new ConnectApi.WrappedValue();
+		propertyValue.value = property;
+		Map<String, ConnectApi.WrappedValue> inputParams = new Map<String, ConnectApi.WrappedValue>();
+		inputParams.put('Input:Query', propertyValue);
+
+		ConnectApi.EinsteinPromptTemplateGenerationsInput executeTemplateInput = new ConnectApi.EinsteinPromptTemplateGenerationsInput();
+		executeTemplateInput.additionalConfig = new ConnectApi.EinsteinLlmAdditionalConfigInput();
+		executeTemplateInput.additionalConfig.applicationName = 'PromptBuilderPreview';
+		executeTemplateInput.isPreview = false;
+		executeTemplateInput.inputParams = inputParams;
+
+		ConnectApi.EinsteinPromptTemplateGenerationsRepresentation generationsOutput = ConnectApi.EinsteinLLM.generateMessagesForPromptTemplate(
+			'Utter_Sense_FAQ',
+			executeTemplateInput
+		);
+
+		ConnectApi.EinsteinLLMGenerationItemOutput output = generationsOutput.generations[0];
+		ResponseWrapper outputResponse = new ResponseWrapper();
+		outputResponse.generatedText = output.text;
+		return outputResponse;
 	}
 
 	public class ResponseWrapper {
