@@ -65,16 +65,14 @@
 				</div>
 			</template>
 
-			<!-- Loop through recommended articles and create child components -->
-			<template if:true={recommendedArticles}>
-				<template for:each={recommendedArticles} for:item="article">
-					<c-utter-sense-knowledge-article key={article.Id} article={article}>
-					</c-utter-sense-knowledge-article>
-				</template>
+			<!-- Show formatted response -->
+			<template if:true={formattedResponse}>
+				<div lwc:dom="manual" class="response-container"></div>
+				<div class="response-container slds-p-around_medium">{response}</div>
 			</template>
 
-			<!-- Show message if no articles are found after search -->
-			<template if:true={noArticlesFound}>
+			<!-- Show message if no response is received after search -->
+			<template if:true={noResponseReceived}>
 				<div class="slds-text-align_center slds-p-around_medium">
 					No recommended articles found.
 				</div>

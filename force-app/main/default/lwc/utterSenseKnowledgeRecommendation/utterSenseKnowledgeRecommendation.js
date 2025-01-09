@@ -18,22 +18,12 @@ export default class UtterSenseKnowledgeRecommendation extends LightningElement 
 		return (
 			!this.isLoading &&
 			this.searchTerm &&
-			(!this.response || !this.response.promptResponse)
+			(!this.response || this.response.length === 0)
 		);
 	}
 
 	get formattedResponse() {
-		if (!this.response || !this.response.promptResponse) {
-			return null;
-		}
-		// Convert response text to HTML with line breaks
-		return this.response.promptResponse
-			.split("\n")
-			.map((line) => {
-				// You might want to add additional formatting here
-				return line.trim();
-			})
-			.filter((line) => line.length > 0);
+		return this.response && this.response.length > 0;
 	}
 
 	// Handle search input changes
@@ -63,7 +53,7 @@ export default class UtterSenseKnowledgeRecommendation extends LightningElement 
 		// eslint-disable-next-line @lwc/lwc/no-async-operation
 		this.delayTimeout = setTimeout(() => {
 			this.searchArticles(searchTerm);
-		}, 300); // Wait 300ms after last keystroke before searching
+		}, 3000); // Wait 3000ms after last keystroke before searching
 	}
 
 	// Search articles using the Apex controller
@@ -73,9 +63,9 @@ export default class UtterSenseKnowledgeRecommendation extends LightningElement 
 
 		try {
 			const result = await getRecommendedResponse({ searchString: searchTerm });
-			this.response = result;
+			this.handleResponse(result);
 
-			if (!result || !result.promptResponse) {
+			if (!result) {
 				throw new Error("No response received from the prompt template");
 			}
 		} catch (error) {
@@ -84,6 +74,15 @@ export default class UtterSenseKnowledgeRecommendation extends LightningElement 
 			this.response = null;
 		} finally {
 			this.isLoading = false;
+		}
+	}
+
+	handleResponse(response) {
+		this.isLoading = false;
+		if (response) {
+			this.response = response.replace(/\n/g, "<br>");
+		} else {
+			this.response = null;
 		}
 	}
 
