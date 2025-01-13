@@ -1,85 +1,95 @@
 import { LightningElement, track } from "lwc";
-import getKnowledgeArticles from "@salesforce/apex/UtterSenseKnowledgeRecController.getKnowledgeArticles";
+import getRecommendedResponse from "@salesforce/apex/UtterSenseKnowledgeRecController.getRecommendedResponse";
+import EINSTEIN_LOGO from "@salesforce/resourceUrl/UtterSenseEinsteinLogo";
 
 export default class UtterSenseKnowledgeRecommendation extends LightningElement {
-	@track recommendedArticles = [];
+	@track response;
 	@track isLoading = false;
-	searchString = "Tesla";
+	@track searchTerm = "";
+	@track error;
+	einsteinLogoUrl = EINSTEIN_LOGO;
 
-	connectedCallback() {
-		this.subscribeToVoiceToolkit();
+	// New properties for placeholder handling
+	get showPlaceholder() {
+		return !this.isLoading && !this.searchTerm && !this.response;
 	}
 
-	disconnectedCallback() {
-		this.unsubscribeFromVoiceToolkit();
-	}
-
-	subscribeToVoiceToolkit() {
-		const toolkitApi = this.template.querySelector(
-			"lightning-service-cloud-voice-toolkit-api"
+	get noResponseReceived() {
+		return (
+			!this.isLoading &&
+			this.searchTerm &&
+			(!this.response || this.response.length === 0)
 		);
-		if (toolkitApi) {
-			toolkitApi.addEventListener(
-				"callstarted",
-				this.handleCallStarted.bind(this)
-			);
-			toolkitApi.addEventListener(
-				"transcript",
-				this.handleTranscript.bind(this)
-			);
-			toolkitApi.addEventListener("callended", this.handleCallEnded.bind(this));
-		}
 	}
 
-	unsubscribeFromVoiceToolkit() {
-		const toolkitApi = this.template.querySelector(
-			"lightning-service-cloud-voice-toolkit-api"
-		);
-		if (toolkitApi) {
-			toolkitApi.removeEventListener(
-				"callstarted",
-				this.handleCallStarted.bind(this)
-			);
-			toolkitApi.removeEventListener(
-				"transcript",
-				this.handleTranscript.bind(this)
-			);
-			toolkitApi.removeEventListener(
-				"callended",
-				this.handleCallEnded.bind(this)
-			);
-		}
+	get formattedResponse() {
+		return this.response && this.response.length > 0;
 	}
 
-	handleCallStarted(event) {
-		console.log("Call started:", event.detail);
+	// Handle search input changes
+	handleSearchChange(event) {
+		const searchTerm = event.target.value;
+		this.searchTerm = searchTerm;
+		this.error = null;
+
+		// If search term is empty, clear results
+		if (!searchTerm) {
+			this.response = null;
+			return;
+		}
+
+		// Debounce the search to avoid too many API calls
+		this.debounceSearch(searchTerm);
+	}
+
+	// Debounce helper
+	debounceSearch(searchTerm) {
+		// Clear any existing timeout
+		if (this.delayTimeout) {
+			clearTimeout(this.delayTimeout);
+		}
+
+		// Set a new timeout
+		// eslint-disable-next-line @lwc/lwc/no-async-operation
+		this.delayTimeout = setTimeout(() => {
+			this.searchArticles(searchTerm);
+		}, 3000); // Wait 3000ms after last keystroke before searching
+	}
+
+	// Search articles using the Apex controller
+	async searchArticles(searchTerm) {
 		this.isLoading = true;
-	}
+		this.error = null;
 
-	handleTranscript(event) {
-		if (event.detail && event.detail.text) {
-			this.searchString = event.detail.text;
-			this.fetchKnowledgeArticles();
-		}
-	}
-
-	handleCallEnded(event) {
-		console.log("Call ended:", event.detail);
-		this.isLoading = false;
-		this.recommendedArticles = [];
-	}
-
-	async fetchKnowledgeArticles() {
-		this.isLoading = true;
 		try {
-			const result = await getKnowledgeArticles({
-				searchString: this.searchString
-			});
-			this.recommendedArticles = result;
+			const result = await getRecommendedResponse({ searchString: searchTerm });
+			this.handleResponse(result);
+
+			if (!result) {
+				throw new Error("No response received from the prompt template");
+			}
 		} catch (error) {
-			console.error("Error fetching knowledge articles:", error);
+			console.error("Error getting response:", error);
+			this.error = error.message || "An unexpected error occurred";
+			this.response = null;
 		} finally {
 			this.isLoading = false;
+		}
+	}
+
+	handleResponse(response) {
+		this.isLoading = false;
+		if (response) {
+			this.response = response.replace(/\n/g, "<br>");
+		} else {
+			this.response = null;
+		}
+	}
+
+	// Clean up when component is removed
+	disconnectedCallback() {
+		if (this.delayTimeout) {
+			clearTimeout(this.delayTimeout);
 		}
 	}
 }

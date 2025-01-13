@@ -5,11 +5,15 @@
 	"description": "Salesforce App",
 	"scripts": {
 		"postinstall": "husky install",
-		"lint": "[ -d \"force-app/main/default/lwc\" ] && eslint \"**/lwc/**/*.js\" \"**/aura/**/*.js\" || echo \"No LWC/Aura files to lint\"",
+		"lint": "[ -d \"force-app/main/default/lwc\" ] && eslint \"**/lwc/**/*.js\" || echo \"No LWC/Aura files to lint\"",
+		"lint:all": "eslint **/*.js",
+		"lint:aura": "eslint **/aura/**/*.js",
+		"lint:lwc": "eslint **/lwc/**/*.js",
 		"precommit": "lint-staged",
 		"prettier": "prettier --write \"**/*.{cls,cmp,component,css,html,js,json,md,page,trigger,xml,yaml,yml}\"",
 		"prettier:verify": "prettier --check \"**/*.{cls,cmp,component,css,html,js,json,md,page,trigger,xml,yaml,yml}\"",
-		"test": "npm run test:unit -- --passWithNoTests",
+		"scan:app": "sfdx scanner:run --target force-app/",
+		"test": "pnpm test:unit -- --passWithNoTests",
 		"test:unit": "sfdx-lwc-jest",
 		"test:unit:coverage": "sfdx-lwc-jest --coverage",
 		"test:unit:debug": "sfdx-lwc-jest --debug"
@@ -17,23 +21,22 @@
 	"lint-staged": {
 		"**/*.{cls,cmp,component,css,html,js,json,md,page,trigger,xml,yaml,yml}": [
 			"prettier --write"
-		],
-		"**/{aura,lwc}/**/*.js": [
-			"eslint"
 		]
 	},
 	"devDependencies": {
 		"@babel/eslint-parser": "^7.25.9",
 		"@babel/plugin-proposal-decorators": "^7.25.9",
-		"@lwc/eslint-plugin-lwc": "^1.8.2",
+		"@lwc/eslint-plugin-lwc": "^1.8.3",
 		"@lwc/jest-preset": "^18.1.0",
 		"@prettier/plugin-xml": "^3.4.1",
-		"@salesforce/eslint-config-lwc": "^3.2.3",
-		"@salesforce/eslint-plugin-aura": "^2.0.0",
+		"@salesforce/eslint-config-lwc": "^3.5.0",
+		"@salesforce/eslint-plugin-aura": "^2.1.0",
 		"@salesforce/eslint-plugin-lightning": "^1.0.0",
 		"@salesforce/sfdx-lwc-jest": "^3.1.0",
+		"@salesforce/sfdx-scanner": "^3.0.0",
 		"eslint": "^8.11.0",
 		"eslint-plugin-import": "^2.25.4",
+		"eslint-plugin-inclusive-language": "^2.2.0",
 		"eslint-plugin-jest": "^27.6.0",
 		"husky": "^8.0.3",
 		"jest": "^29.7.0",

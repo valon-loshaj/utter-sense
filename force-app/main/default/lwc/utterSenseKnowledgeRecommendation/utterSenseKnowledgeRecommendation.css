@@ -2,3 +2,38 @@
 .slds-card {
 	background: #ffffff;
 }
+
+.einstein-logo {
+	width: 40px;
+	height: 40px;
+	margin: 0 auto;
+}
+
+.einstein-logo-large {
+	width: 84px;
+	height: 84px;
+}
+
+.slds-box {
+	background-color: #ffffff;
+	border-radius: 4px;
+}
+
+.content-container {
+	position: relative;
+	min-height: 200px;
+}
+
+.spinner-container {
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	background: rgba(255, 255, 255, 0.75);
+	z-index: 1;
+}
+
+.response-container {
+	position: relative;
+}

@@ -1,36 +1,40 @@
 public with sharing class UtterSenseKnowledgeRecController {
 	@AuraEnabled
-	public static List<Knowledge__kav> getKnowledgeArticles(String searchString) {
+	public static String getRecommendedResponse(String searchString) {
+		// Create inputs
+		ConnectApi.WrappedValue searchStringPropValue = new ConnectApi.WrappedValue();
+		searchStringPropValue.value = searchString;
+		Map<String, ConnectApi.WrappedValue> inputParams = new Map<String, ConnectApi.WrappedValue>();
+		inputParams.put('Input:Query', searchStringPropValue);
+		inputParams.put('Input:RetrieverIdOrName', '');
+		// Configure invocation parameters
+		ConnectApi.EinsteinPromptTemplateGenerationsInput executeTemplateInput = new ConnectApi.EinsteinPromptTemplateGenerationsInput();
+		executeTemplateInput.additionalConfig = new ConnectApi.EinsteinLlmAdditionalConfigInput();
+		executeTemplateInput.additionalConfig.applicationName = 'PromptBuilderPreview';
+		executeTemplateInput.isPreview = false;
+		executeTemplateInput.inputParams = inputParams;
+
+		System.debug('Execute Template Input: ' + executeTemplateInput);
+
 		try {
-			if (String.isBlank(searchString)) {
-				return new List<Knowledge__kav>();
-			}
+			// Call the service
+			ConnectApi.EinsteinPromptTemplateGenerationsRepresentation generationsOutput = ConnectApi.EinsteinLLM.generateMessagesForPromptTemplate(
+				'Utter_Sense_FAQ',
+				executeTemplateInput
+			);
 
-			// Escape special characters in search string
-			searchString = String.escapeSingleQuotes(searchString);
-
-			// Build SOSL query
-			String searchQuery =
-				'FIND :searchString IN ALL FIELDS RETURNING Knowledge__kav(' +
-				'Id, Title, Summary, UrlName, ArticleNumber, LastPublishedDate ' +
-				'WHERE PublishStatus = \'Online\' AND Language = \'en_US\' ' +
-				'ORDER BY LastPublishedDate DESC LIMIT 5)';
-
-			List<List<SObject>> searchResults = Search.query(searchQuery);
-
-			if (!searchResults.isEmpty() && !searchResults[0].isEmpty()) {
-				return (List<Knowledge__kav>) searchResults[0];
-			}
-
-			return new List<Knowledge__kav>();
-		} catch (Exception e) {
+			System.debug('Citations: ' + generationsOutput.citations);
+			System.debug('Generation Errors: ' + generationsOutput.generationErrors);
+			System.debug('Generations: ' + generationsOutput.generations);
+			System.debug('Prompt: ' + generationsOutput.prompt);
 			System.debug(
-				LoggingLevel.ERROR,
-				'Error in getKnowledgeArticles: ' + e.getMessage()
+				'Prompt Template Dev Name: ' + generationsOutput.promptTemplateDevName
 			);
-			throw new AuraHandledException(
-				'Error retrieving knowledge articles: ' + e.getMessage()
-			);
+			ConnectApi.EinsteinLLMGenerationItemOutput response = generationsOutput.generations[0];
+			return response.text;
+		} catch (Exception e) {
+			System.debug(e.getMessage());
+			throw e;
 		}
 	}
 }

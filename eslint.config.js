@@ -2,6 +2,7 @@ const eslint = require("@eslint/js");
 const lwc = require("@lwc/eslint-plugin-lwc");
 const salesforceLwc = require("@salesforce/eslint-config-lwc/recommended");
 const lightning = require("@salesforce/eslint-plugin-lightning");
+const aura = require("@salesforce/eslint-plugin-aura");
 
 module.exports = [
 	eslint.configs.recommended,
@@ -13,14 +14,20 @@ module.exports = [
 		},
 		languageOptions: {
 			globals: {
-				// Add any global variables used in LWC
-				$: true,
-				require: true,
-				console: true
+				// Salesforce specific globals
+				$A: "readonly",
+				sforce: "readonly",
+				moment: "readonly",
+				// Browser globals
+				window: "readonly",
+				document: "readonly",
+				console: "readonly"
 			},
 			parser: require("@babel/eslint-parser"),
 			parserOptions: {
 				requireConfigFile: false,
+				ecmaVersion: 2022,
+				sourceType: "module",
 				babelOptions: {
 					plugins: [
 						[
@@ -37,7 +44,9 @@ module.exports = [
 		rules: {
 			...salesforceLwc.rules,
 			"@lwc/lwc/no-api-reassignments": "error",
-			"@salesforce/lightning/valid-apex-method-invocation": "error"
+			"@salesforce/lightning/valid-apex-method-invocation": "error",
+			"@lwc/lwc/no-unknown-wire-adapters": "error",
+			"@lwc/lwc/no-unexpected-wire-adapter-usages": "error"
 		}
 	},
 	{
@@ -47,19 +56,27 @@ module.exports = [
 				// Jest globals
 				describe: "readonly",
 				beforeEach: "readonly",
+				afterEach: "readonly",
+				beforeAll: "readonly",
+				afterAll: "readonly",
 				it: "readonly",
 				expect: "readonly",
-				// Browser globals
-				document: "readonly",
-				window: "readonly",
-				console: "readonly"
+				jest: "readonly",
+				// Add testing utilities globals
+				createElement: "readonly",
+				getNavigateCalledWith: "readonly"
 			}
 		}
 	},
 	{
 		files: ["**/aura/**/*.js"],
+		plugins: {
+			"@salesforce/aura": aura
+		},
 		rules: {
 			// Aura specific rules
+			"@salesforce/aura/no-deprecated-apis": "error",
+			"@salesforce/aura/no-async-operation": "error"
 		}
 	}
 ];
