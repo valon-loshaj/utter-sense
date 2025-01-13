@@ -7,3 +7,5 @@ I use pnpm as my preferred pacakge maanger, keep this in mind when referencing a
 The main directory for this application is the force-app directory found in the root of the project.
 
 When working with JavaScript modules, I prefer to use modern ES Modules and not Common JS. If there is an instance where Common JS is required, I'd like you to explicitly call that out and explain the considerations.
+
+When writing code for features, I prefer to opt for standards based first. Meaning that you try to use CSS scoping and CS starting style and all those new CSS standards. Similarly for HTML and JavaScript, I prefer to use the latest standards and best practices. I prefer to make choices that move furter from a library or framework and more towards standards.
