@@ -1,0 +1,72 @@
+<template>
+	<div class="audio-recorder">
+		<div class="device-selection">
+			<label for="audioDevices">Select Microphone:</label>
+			<select
+				id="audioDevices"
+				class="audio-device-select"
+				onchange={handleDeviceChange}
+				disabled={isRecording}
+			>
+				<template for:each={audioDevices} for:item="device">
+					<option key={device.deviceId} value={device.deviceId}>
+						{device.label}
+					</option>
+				</template>
+			</select>
+		</div>
+
+		<div class="controls">
+			<button
+				class="record-button"
+				onclick={initializeRecording}
+				disabled={micInitialized}
+			>
+				Initialize Microphone
+			</button>
+
+			<button
+				class="record-button"
+				onclick={startRecording}
+				disabled={isRecording}
+			>
+				Start Recording
+			</button>
+
+			<button
+				class="stop-button"
+				onclick={stopRecording}
+				disabled={notRecording}
+			>
+				Stop Recording
+			</button>
+		</div>
+
+		<div class="preview">
+			<template if:true={audioURL}>
+				<div>URL Value: {audioURL}</div>
+				<audio src={audioURL} controls></audio>
+			</template>
+		</div>
+
+		<div class="audio-monitor" if:true={isRecording}>
+			<canvas class="visualizer" lwc:dom="manual"></canvas>
+		</div>
+
+		<div class="volume-meter">
+			<div class="volume-meter-container">
+				<div class="volume-meter-fill"></div>
+			</div>
+			<div if:true={audioStreamActive} class="stream-status active">
+				Stream Active
+			</div>
+			<div if:false={audioStreamActive} class="stream-status inactive">
+				Stream Inactive
+			</div>
+		</div>
+
+		<template if:false={mimeTypeSupported}>
+			<p class="error-message">MIME type not supported</p>
+		</template>
+	</div>
+</template>
