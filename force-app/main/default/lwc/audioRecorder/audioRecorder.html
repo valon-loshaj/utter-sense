@@ -65,8 +65,16 @@
 			</div>
 		</div>
 
-		<template if:false={mimeTypeSupported}>
-			<p class="error-message">MIME type not supported</p>
-		</template>
+		<div class="conversation-container">
+			<template if:true={transcripts.length}>
+				<div class="transcripts">
+					<template for:each={transcripts} for:item="transcript">
+						<div key={transcript.id} class="transcript-bubble">
+							{transcript.text}
+						</div>
+					</template>
+				</div>
+			</template>
+		</div>
 	</div>
 </template>
