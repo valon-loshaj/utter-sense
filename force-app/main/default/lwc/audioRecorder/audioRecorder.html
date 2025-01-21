@@ -8,6 +8,7 @@
 				onchange={handleDeviceChange}
 				disabled={isRecording}
 			>
+				<option value="">Select a microphone...</option>
 				<template for:each={audioDevices} for:item="device">
 					<option key={device.deviceId} value={device.deviceId}>
 						{device.label}
@@ -28,15 +29,15 @@
 			<button
 				class="record-button"
 				onclick={startRecording}
-				disabled={isRecording}
+				disabled={notRecording}
 			>
-				Start Recording
+				{recordButtonLabel}
 			</button>
 
 			<button
 				class="stop-button"
 				onclick={stopRecording}
-				disabled={notRecording}
+				disabled={stopButtonDisabled}
 			>
 				Stop Recording
 			</button>
@@ -51,18 +52,6 @@
 
 		<div class="audio-monitor" if:true={isRecording}>
 			<canvas class="visualizer" lwc:dom="manual"></canvas>
-		</div>
-
-		<div class="volume-meter">
-			<div class="volume-meter-container">
-				<div class="volume-meter-fill"></div>
-			</div>
-			<div if:true={audioStreamActive} class="stream-status active">
-				Stream Active
-			</div>
-			<div if:false={audioStreamActive} class="stream-status inactive">
-				Stream Inactive
-			</div>
 		</div>
 
 		<div class="conversation-container">

@@ -50,10 +50,10 @@ export class AudioDeviceService {
 		}
 	}
 
-	async getAvailableDevices() {
+	async getAvailableDevices(initializeStream = true) {
 		try {
-			// Request permission first to get labeled devices
-			if (!this.stream) {
+			// Only initialize stream if explicitly requested
+			if (initializeStream && !this.stream) {
 				await this.initialize();
 			}
 
@@ -62,13 +62,8 @@ export class AudioDeviceService {
 				.filter((device) => device.kind === "audioinput")
 				.map((device) => ({
 					deviceId: device.deviceId,
-					label: device.label || `Microphone ${this.audioDevices.length + 1}`
+					label: device.label || `Microphone ${device.deviceId.slice(0, 4)}`
 				}));
-
-			// If no device is selected yet, select the default
-			if (!this.selectedDeviceId && this.audioDevices.length > 0) {
-				this.selectedDeviceId = this.audioDevices[0].deviceId;
-			}
 
 			return this.audioDevices;
 		} catch (error) {
