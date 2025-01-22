@@ -1,27 +1,53 @@
+/**
+ * @description Controller class for handling Knowledge Article recommendations using Einstein LLM
+ * @group Knowledge Management
+ */
 public with sharing class UtterSenseKnowledgeRecController {
-	// Wrapper class to handle the response
+	/**
+	 * @description Wrapper class to handle the response from the knowledge recommendation service
+	 */
 	public class KnowledgeRecommendationResponse {
+		/**
+		 * @description The AI-generated response text based on the knowledge articles
+		 */
 		@AuraEnabled
 		public String responseText { get; set; }
+
+		/**
+		 * @description List of error messages if any occurred during processing
+		 */
 		@AuraEnabled
 		public List<String> errors { get; set; }
+
+		/**
+		 * @description Indicates whether the recommendation process was successful
+		 */
 		@AuraEnabled
 		public Boolean isSuccess { get; set; }
 
+		/**
+		 * @description Constructor to initialize the response object
+		 */
 		public KnowledgeRecommendationResponse() {
 			this.errors = new List<String>();
 			this.isSuccess = true;
 		}
 	}
 
+	/**
+	 * @description Gets recommended responses based on the search string using Knowledge articles and Einstein LLM
+	 * @param searchString The text to search for relevant knowledge articles
+	 * @return KnowledgeRecommendationResponse containing the AI-generated response and any errors
+	 */
 	@AuraEnabled
 	public static KnowledgeRecommendationResponse getRecommendedResponse(
 		String searchString
 	) {
 		KnowledgeRecommendationResponse response = new KnowledgeRecommendationResponse();
+		LoggingLevel logLevel = LoggingLevel.DEBUG;
 
 		try {
-			System.debug('Search string received: ' + searchString);
+			Logger.debug(logLevel, 'Search string received: ' + searchString);
 
 			// First, query Knowledge articles
 			List<Knowledge__kav> articles = [
@@ -50,8 +76,8 @@ public with sharing class UtterSenseKnowledgeRecController {
 			inputParams.put('Input:searchText', searchStringPropValue);
 			inputParams.put('Input:knowledge', knowledgePropValue);
 
-			System.debug('Input search text: ' + searchString);
-			System.debug('Knowledge articles found: ' + articles.size());
+			Logger.debug(logLevel, 'Input search text: ' + searchString);
+			Logger.debug(logLevel, 'Knowledge articles found: ' + articles.size());
 
 			// Configure invocation parameters
 			ConnectApi.EinsteinPromptTemplateGenerationsInput executeTemplateInput = new ConnectApi.EinsteinPromptTemplateGenerationsInput();
@@ -76,7 +102,7 @@ public with sharing class UtterSenseKnowledgeRecController {
 					ConnectApi.EinsteinPromptTemplateGenerationsError error : generationsOutput.generationErrors
 				) {
 					String errorMsg = error.errorMessage;
-					System.debug('Generation error: ' + errorMsg);
+					Logger.error('Generation error: ' + errorMsg);
 					response.errors.add(errorMsg);
 				}
 				return response;
@@ -89,18 +115,15 @@ public with sharing class UtterSenseKnowledgeRecController {
 			) {
 				ConnectApi.EinsteinLLMGenerationItemOutput generationResponse = generationsOutput.generations[0];
 				response.responseText = generationResponse.text;
-				System.debug('Generated response: ' + response.responseText);
+				Logger.debug(logLevel, 'Generated response: ' + response.responseText);
 			} else {
-				System.debug('No generations found in the response');
+				Logger.warn('No generations found in the response');
 				response.isSuccess = false;
 				response.errors.add('No response generated from the model.');
 			}
 		} catch (Exception e) {
-			System.debug(LoggingLevel.ERROR, 'Exception caught: ' + e.getMessage());
-			System.debug(
-				LoggingLevel.ERROR,
-				'Stack trace: ' + e.getStackTraceString()
-			);
+			Logger.error('Exception caught: ' + e.getMessage());
+			Logger.error('Stack trace: ' + e.getStackTraceString());
 			response.isSuccess = false;
 			response.errors.add('Error: ' + e.getMessage());
 		}

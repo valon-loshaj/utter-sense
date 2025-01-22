@@ -3,8 +3,7 @@
     <canAccessCamera>false</canAccessCamera>
     <canAccessMicrophone>true</canAccessMicrophone>
     <context>All</context>
-    <description>Google APIs</description>
-    <endpointUrl>https://*.googleapis.com</endpointUrl>
+    <endpointUrl>https://api.openai.com</endpointUrl>
     <isActive>true</isActive>
     <isApplicableToConnectSrc>true</isApplicableToConnectSrc>
     <isApplicableToFontSrc>true</isApplicableToFontSrc>

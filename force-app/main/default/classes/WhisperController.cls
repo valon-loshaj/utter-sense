@@ -1,143 +1,204 @@
+/**
+ * @description Controller class for handling Whisper API transcription functionality
+ * @author Your Name
+ * @group Speech Recognition
+ */
 public with sharing class WhisperController {
+	// TODO: Replace with Named Credentials once configured
+	private static final String WHISPER_API_ENDPOINT = 'https://api.openai.com/v1/audio/transcriptions';
+	private static final String BOUNDARY = '----WhisperFormBoundary7MA4YWxkTrZu0gW';
+	private static final String EXTRA_BOUNDARY = '--' + BOUNDARY;
+
+	/**
+	 * @description Response wrapper class for Whisper API transcription results
+	 */
+	public class TranscriptionResponse {
+		@AuraEnabled
+		public String text { get; set; }
+		@AuraEnabled
+		public String language { get; set; }
+		@AuraEnabled
+		public Double duration { get; set; }
+	}
+
+	/**
+	 * @description Custom exception class for Whisper API related errors
+	 */
+	public class WhisperAPIException extends Exception {
+	}
+
+	/**
+	 * @description Transcribes audio data using OpenAI's Whisper API
+	 * @param audioBase64 Base64 encoded audio data to transcribe
+	 * @return TranscriptionResponse containing the transcribed text and metadata
+	 * @throws AuraHandledException if transcription fails
+	 */
 	@AuraEnabled
-	public static String transcribeAudio(String audioBase64) {
-		System.debug('=== Starting Whisper Transcription Process ===');
+	public static TranscriptionResponse transcribeAudio(String audioBase64) {
+		LoggingLevel logLevel = LoggingLevel.DEBUG;
+		Logger.debug(logLevel, '=== Starting Whisper Transcription Process ===');
 
 		try {
-			// Log input validation
+			// Input validation
 			if (String.isBlank(audioBase64)) {
-				System.debug('Audio data is null or empty');
-				throw new AuraHandledException('No audio data provided');
+				throw new WhisperAPIException('No audio data provided');
 			}
-			System.debug(
-				'Audio data received. Base64 length: ' + audioBase64.length()
+
+			// Get API key
+			String apiKey = getOpenAIKey();
+
+			// Convert base64 to blob
+			Blob audioBlob = EncodingUtil.base64Decode(audioBase64);
+
+			// Prepare metadata
+			Map<String, String> metadataMap = new Map<String, String>{
+				'model' => 'whisper-1'
+			};
+
+			// Create multipart form data
+			Blob formDataBlob = createMultipartFormData(
+				audioBlob,
+				'audio/webm',
+				'audio.webm',
+				metadataMap
 			);
 
-			// Get the API key
-			String apiKey = getOpenAIKey();
-			System.debug('Successfully retrieved OpenAI API key');
-
-			// Prepare the HTTP request
+			// Prepare HTTP request
 			HttpRequest req = new HttpRequest();
-			req.setEndpoint('https://api.openai.com/v1/audio/transcriptions');
+			req.setEndpoint(WHISPER_API_ENDPOINT);
 			req.setMethod('POST');
-			req.setTimeout(120000); // Set timeout to 120 seconds for large audio files
-
-			// Set required headers
 			req.setHeader('Authorization', 'Bearer ' + apiKey);
-			String boundary = String.valueOf(System.currentTimeMillis());
 			req.setHeader(
 				'Content-Type',
-				'multipart/form-data; boundary=' + boundary
+				'multipart/form-data; boundary=' + BOUNDARY
 			);
+			req.setTimeout(120000);
+			req.setBodyAsBlob(formDataBlob);
 
-			// Construct the multipart form body with all available options
-			String body = constructMultipartFormBody(boundary, audioBase64);
-			req.setBody(body);
-
-			// Log request details (excluding sensitive data)
-			System.debug('=== Request Details ===');
-			System.debug('Endpoint: ' + req.getEndpoint());
-			System.debug('Method: ' + req.getMethod());
-			System.debug('Content-Type: ' + req.getHeader('Content-Type'));
-			System.debug('Body length: ' + body.length());
-
-			// Send the request
-			System.debug('Sending request to OpenAI API...');
+			// Send request
+			Logger.debug(logLevel, 'Sending request to Whisper API...');
 			Http http = new Http();
 			HttpResponse res = http.send(req);
 
-			// Log response details
-			System.debug('=== Response Details ===');
-			System.debug('Status Code: ' + res.getStatusCode());
-			System.debug('Status: ' + res.getStatus());
+			// Process response
+			Logger.debug(logLevel, 'Response Status Code: ' + res.getStatusCode());
+			Logger.debug(logLevel, 'Response Body: ' + res.getBody());
 
-			// Handle the response
 			if (res.getStatusCode() == 200) {
-				Map<String, Object> responseMap = (Map<String, Object>) JSON.deserializeUntyped(
+				Map<String, Object> responseBody = (Map<String, Object>) JSON.deserializeUntyped(
 					res.getBody()
 				);
-				String transcription = (String) responseMap.get('text');
-				System.debug(
-					'Transcription successful. Text length: ' +
-					(transcription != null ? transcription.length() : 0)
-				);
-				return transcription;
+				TranscriptionResponse response = new TranscriptionResponse();
+				response.text = (String) responseBody.get('text');
+				response.language = (String) responseBody.get('language');
+				response.duration = (Double) responseBody.get('duration');
+				return response;
 			} else {
-				String errorBody = res.getBody();
-				System.debug('API Error Status Code: ' + res.getStatusCode());
-				System.debug('API Error Status: ' + res.getStatus());
-				System.debug('API Error Response Body: ' + errorBody);
-
-				// Try to parse error response for more details
-				try {
-					Map<String, Object> errorMap = (Map<String, Object>) JSON.deserializeUntyped(
-						errorBody
-					);
-					System.debug('Parsed Error Details: ' + errorMap);
-				} catch (Exception e) {
-					System.debug('Could not parse error response: ' + e.getMessage());
-				}
-
-				throw new AuraHandledException(
-					'Failed to transcribe audio. Status: ' +
-						res.getStatusCode() +
-						', Response: ' +
-						errorBody
-				);
+				String errorMessage =
+					'Error calling Whisper API. Status: ' +
+					res.getStatusCode() +
+					', Response: ' +
+					res.getBody();
+				throw new WhisperAPIException(errorMessage);
 			}
 		} catch (Exception e) {
-			System.debug('=== Error Details ===');
-			System.debug('Error Type: ' + e.getTypeName());
-			System.debug('Error Message: ' + e.getMessage());
-			System.debug('Stack Trace: ' + e.getStackTraceString());
+			Logger.error('Error Type: ' + e.getTypeName());
+			Logger.error('Error Message: ' + e.getMessage());
+			Logger.error('Stack Trace: ' + e.getStackTraceString());
 			throw new AuraHandledException(
 				'Error transcribing audio: ' + e.getMessage()
 			);
-		} finally {
-			System.debug('=== Ending Whisper Transcription Process ===');
 		}
 	}
 
-	private static String getOpenAIKey() {
-		System.debug('Retrieving OpenAI API key from custom settings');
-		OpenAI_Settings__c settings = OpenAI_Settings__c.getInstance();
+	/**
+	 * @description Creates multipart form data for the API request
+	 * @param file The file blob to include in the form data
+	 * @param contentType The content type of the file
+	 * @param filename The name of the file
+	 * @param metadataMap Additional metadata to include in the form data
+	 * @return Blob The complete multipart form data
+	 */
+	private static Blob createMultipartFormData(
+		Blob file,
+		String contentType,
+		String filename,
+		Map<String, String> metadata
+	) {
+		contentType = String.isBlank(contentType)
+			? 'application/octet-stream'
+			: contentType;
 
+		// Create the file part header
+		String fileHeader =
+			EXTRA_BOUNDARY +
+			'\r\n' +
+			'Content-Disposition: form-data; name="file"; filename="' +
+			filename +
+			'"\r\n' +
+			'Content-Type: ' +
+			contentType +
+			'\r\n\r\n';
+
+		// Convert the file part header to hex
+		String bodyStartHex = EncodingUtil.convertToHex(Blob.valueOf(fileHeader));
+
+		// Add the file content
+		bodyStartHex += EncodingUtil.convertToHex(file);
+
+		// Add metadata fields if present
+		if (metadata != null && !metadata.isEmpty()) {
+			String formElements = '\r\n';
+			for (String key : metadata.keySet()) {
+				formElements +=
+					EXTRA_BOUNDARY +
+					'\r\n' +
+					'Content-Disposition: form-data; name="' +
+					key +
+					'"\r\n\r\n' +
+					metadata.get(key) +
+					'\r\n';
+			}
+			bodyStartHex += EncodingUtil.convertToHex(Blob.valueOf(formElements));
+		}
+
+		// Add the closing boundary
+		String bodyEndHex = EncodingUtil.convertToHex(
+			Blob.valueOf(
+				(metadata == null || metadata.isEmpty() ? '\r\n' : '') +
+					EXTRA_BOUNDARY +
+					'--'
+			)
+		);
+
+		// Combine all parts and convert back to blob
+		return EncodingUtil.convertFromHex(bodyStartHex + bodyEndHex);
+	}
+
+	/**
+	 * @description Retrieves the OpenAI API key from custom settings
+	 * @return String The OpenAI API key
+	 * @throws WhisperAPIException if the API key is not configured
+	 */
+	private static String getOpenAIKey() {
+		OpenAI_Settings__c settings = OpenAI_Settings__c.getInstance();
 		if (settings != null && String.isNotBlank(settings.API_Key__c)) {
 			return settings.API_Key__c;
 		}
-
-		System.debug('OpenAI API key not found in custom settings');
-		throw new AuraHandledException('OpenAI API key not configured');
+		throw new WhisperAPIException('OpenAI API key not configured');
 	}
 
-	private static String constructMultipartFormBody(
-		String boundary,
-		String audioBase64
-	) {
-		System.debug('Constructing multipart form body');
-
-		String body = '';
-
-		// Add file part
-		body += '--' + boundary + '\r\n';
-		body += 'Content-Disposition: form-data; name="file"; filename="audio.mp3"\r\n';
-		body += 'Content-Type: audio/mpeg\r\n\r\n';
-		body += audioBase64 + '\r\n';
-
-		// Add model (required)
-		body += '--' + boundary + '\r\n';
-		body += 'Content-Disposition: form-data; name="model"\r\n\r\n';
-		body += 'whisper-1\r\n';
-
-		// Close the multipart form
-		body += '--' + boundary + '--';
-
-		System.debug('Multipart form body structure:');
-		System.debug('1. File part with audio/mpeg content type');
-		System.debug('2. Model part with value: whisper-1');
-		System.debug('Total body length: ' + body.length());
-
-		return body;
+	/**
+	 * @description Retrieves the OpenAI API key for client-side use
+	 * @return String The OpenAI API key
+	 * @throws AuraHandledException if the API key is not configured
+	 */
+	@AuraEnabled
+	public static String getOpenAIApiKey() {
+		OpenAI_Settings__c settings = OpenAI_Settings__c.getInstance();
+		if (settings != null && String.isNotBlank(settings.API_Key__c)) {
+			return settings.API_Key__c;
+		}
+		throw new AuraHandledException('OpenAI API key not configured');
 	}
 }

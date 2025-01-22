@@ -88,7 +88,6 @@ export default class AudioRecorder extends LightningElement {
 		this.isProcessing = true;
 		this.whisperService.stop();
 		this.isRecording = false;
-		// The transcript will be added when the WhisperService processes the final audio chunk
 	}
 
 	addTranscript(text) {

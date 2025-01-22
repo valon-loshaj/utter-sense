@@ -1,15 +1,61 @@
 import { AudioRecorderError, ErrorCodes } from "./audioRecorderError";
 import transcribeAudio from "@salesforce/apex/WhisperController.transcribeAudio";
 
+// Debug utility to safely stringify objects
+const debugLog = (label, data) => {
+	try {
+		let logData;
+		if (data instanceof Error) {
+			logData = {
+				message: data.message,
+				name: data.name,
+				stack: data.stack,
+				...(data.details && {
+					details: JSON.parse(JSON.stringify(data.details))
+				})
+			};
+		} else if (data instanceof Blob) {
+			logData = {
+				type: data.type,
+				size: data.size
+			};
+		} else if (typeof data === "object" && data !== null) {
+			// Handle both arrays and objects
+			logData = JSON.parse(
+				JSON.stringify(data, (key, value) => {
+					if (value instanceof Blob) {
+						return {
+							type: value.type,
+							size: value.size
+						};
+					}
+					return value;
+				})
+			);
+		} else {
+			logData = data;
+		}
+
+		console.log(`[WhisperService] ${label}:`, logData);
+	} catch (error) {
+		console.log(
+			`[WhisperService] ${label}: [Unable to stringify data]`,
+			typeof data === "object" ? Object.keys(data) : typeof data,
+			error
+		);
+	}
+};
+
 export class WhisperService {
 	constructor() {
 		this.mediaRecorder = null;
 		this.audioChunks = [];
 		this._isRecording = false;
+		this.RECORDING_FORMAT = "audio/webm";
 	}
 
 	async initialize() {
-		// No initial setup needed for Whisper
+		debugLog("Initializing WhisperService", {});
 		return true;
 	}
 
@@ -18,44 +64,29 @@ export class WhisperService {
 			this._isRecording = true;
 			this.audioChunks = [];
 
-			// Set up MediaRecorder with audio settings optimal for Whisper
-			const options = {
-				mimeType: "audio/mp3",
-				audioBitsPerSecond: 128000
-			};
-
-			// Fallback options if mp3 is not supported
-			const mimeTypes = [
-				"audio/mp3",
-				"audio/mpeg",
-				"audio/ogg",
-				"audio/wav",
-				"audio/webm"
-			];
-
-			let selectedMimeType = null;
-			for (const mimeType of mimeTypes) {
-				if (MediaRecorder.isTypeSupported(mimeType)) {
-					selectedMimeType = mimeType;
-					break;
-				}
-			}
-
-			if (!selectedMimeType) {
+			// Check if webm format is supported
+			if (!MediaRecorder.isTypeSupported(this.RECORDING_FORMAT)) {
 				throw new AudioRecorderError(
 					ErrorCodes.BROWSER_SUPPORT,
-					"No supported audio format found"
+					"WebM audio format is not supported by your browser"
 				);
 			}
 
-			options.mimeType = selectedMimeType;
-			console.log("Using audio format:", selectedMimeType);
+			const options = {
+				mimeType: this.RECORDING_FORMAT,
+				audioBitsPerSecond: 128000
+			};
 
 			this.mediaRecorder = new MediaRecorder(window.audioStream, options);
+			debugLog("MediaRecorder initialized with options", options);
 
 			this.mediaRecorder.ondataavailable = (event) => {
 				if (event.data.size > 0) {
 					this.audioChunks.push(event.data);
+					debugLog("Audio chunk collected", {
+						size: event.data.size,
+						type: event.data.type
+					});
 				}
 			};
 
@@ -63,43 +94,64 @@ export class WhisperService {
 				try {
 					if (this.audioChunks.length > 0) {
 						const audioBlob = new Blob(this.audioChunks, {
-							type: selectedMimeType
+							type: this.RECORDING_FORMAT
 						});
-						await this.sendToWhisper(audioBlob, onTranscriptionComplete);
+						debugLog("Audio blob created", {
+							size: audioBlob.size,
+							type: audioBlob.type,
+							chunks: this.audioChunks.length
+						});
+
+						// check the mediaRecorder.onstop handler to make sure the audioBlob is a webm file
+						if (!audioBlob.type.includes("webm")) {
+							throw new Error(
+								`Invalid audio format: ${audioBlob.type}. Expected audio/webm`
+							);
+						}
+
+						// Verify the blob is valid
+						if (audioBlob.size === 0) {
+							throw new Error("Generated audio blob is empty");
+						}
+
+						// Convert blob to base64
+						const base64Audio = await this.blobToBase64(audioBlob);
+						debugLog("Audio converted to base64", {
+							base64Length: base64Audio.length,
+							originalSize: audioBlob.size
+						});
+
+						// Send to server for transcription
+						const response = await transcribeAudio({
+							audioBase64: base64Audio
+						});
+						debugLog("Received transcription response", response);
+
+						if (response && response.text) {
+							onTranscriptionComplete(response.text);
+						} else {
+							throw new Error("No transcription text received");
+						}
 					}
 				} catch (error) {
-					onError(error);
+					debugLog("Error in onstop handler", error);
+					onError(
+						new AudioRecorderError(
+							ErrorCodes.PROCESSING_ERROR,
+							error.message || "Error processing audio",
+							{ originalError: error }
+						)
+					);
 				}
 			};
 
 			this.mediaRecorder.start(1000); // Collect data in 1-second chunks
 		} catch (error) {
+			debugLog("Error starting recording", error);
 			this._isRecording = false;
 			throw new AudioRecorderError(
 				ErrorCodes.DEVICE_ERROR,
 				"Failed to start recording",
-				{ originalError: error }
-			);
-		}
-	}
-
-	async sendToWhisper(audioBlob, onTranscriptionComplete) {
-		try {
-			// Convert blob to base64
-			const base64Audio = await this.blobToBase64(audioBlob);
-
-			// Call Apex method to transcribe audio
-			const transcription = await transcribeAudio({ audioBase64: base64Audio });
-
-			if (transcription) {
-				onTranscriptionComplete(transcription);
-			} else {
-				throw new Error("No transcription received");
-			}
-		} catch (error) {
-			throw new AudioRecorderError(
-				ErrorCodes.NETWORK_ERROR,
-				"Failed to get transcription from Whisper API",
 				{ originalError: error }
 			);
 		}
@@ -116,7 +168,10 @@ export class WhisperService {
 				);
 				resolve(base64String);
 			};
-			reader.onerror = reject;
+			reader.onerror = (error) => {
+				debugLog("Error converting blob to base64", error);
+				reject(error);
+			};
 			reader.readAsDataURL(blob);
 		});
 	}

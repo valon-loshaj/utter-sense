@@ -43,13 +43,6 @@
 			</button>
 		</div>
 
-		<div class="preview">
-			<template if:true={audioURL}>
-				<div>URL Value: {audioURL}</div>
-				<audio src={audioURL} controls></audio>
-			</template>
-		</div>
-
 		<div class="audio-monitor" if:true={isRecording}>
 			<canvas class="visualizer" lwc:dom="manual"></canvas>
 		</div>

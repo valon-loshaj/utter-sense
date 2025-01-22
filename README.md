@@ -15,6 +15,7 @@ Before installing this package, ensure you have:
 - A Salesforce org with AgentForce enabled
 - Prompt Builder permission sets assigned to users who will be using this feature
 - Salesforce CLI installed on your machine
+- OpenAI API key for audio transcription and text-to-speech features
 
 ## Installation 🚀
 
@@ -25,6 +26,29 @@ Before installing this package, ensure you have:
 sf project deploy start -d force-app
 ```
 
+3. Assign the Utter Sense permissions to users:
+
+```bash
+sf apex run --file scripts/apex/assign-permissions.apex -u your-org-alias
+```
+
+4. Configure OpenAI Settings:
+   - Navigate to Setup > Custom Settings
+   - Find "OpenAI Settings" and click "Manage"
+   - Create a new record and enter your OpenAI API key
+
+## Features 🌟
+
+### Audio Recorder Component 🎙️
+
+The Audio Recorder component enables seamless voice interaction within the Salesforce interface:
+
+- Real-time audio recording from user's microphone
+- Automatic transcription of voice input using OpenAI's Whisper API
+- Text-to-speech response playback for agent-generated content
+- Support for multiple audio input devices
+- Visual feedback during recording and playback
+
 ## Usage 🎮
 
 Once deployed, follow these steps to use Utter Sense:
@@ -32,7 +56,11 @@ Once deployed, follow these steps to use Utter Sense:
 1. Navigate to the "Utter Sense" Lightning application in your Salesforce org
 2. The Utter Sense component is automatically added to the Case Lightning Record Page
 3. Open any case record to see the component in action
-4. The component will automatically listen to voice calls and provide real-time knowledge article recommendations based on the conversation
+4. Use the Audio Recorder to:
+   - Start/stop voice recording
+   - Review transcribed text
+   - Listen to agent responses
+5. The component will automatically process voice input and provide real-time knowledge article recommendations based on the conversation
 
 ## Contributors 👥
 
