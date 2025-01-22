@@ -1,9 +1,48 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <Package xmlns="http://soap.sforce.com/2006/04/metadata">
 	<types>
+        <members>Utter_Sense</members>
+        <name>CustomApplication</name>
+    </types>
+	<types>
+		<members>WhisperController</members>
+		<members>UtterSenseKnowledgeRecController</members>
+		<name>ApexClass</name>
+	</types>
+	<types>
+		<members>audioRecorder</members>
+		<members>utterSenseKnowledgeRecommendation</members>
+		<members>utterSenseKnowledgeArticle</members>
+		<name>LightningComponentBundle</name>
+	</types>
+	<types>
+		<members>*</members>
+		<name>CorsWhitelistOrigin</name>
+	</types>
+	<types>
+		<members>*</members>
+		<name>CspTrustedSite</name>
+	</types>
+	<types>
+		<members>Utter_Sense_Case_Page</members>
+		<members>Utter_Sense_UtilityBar</members>
+		<name>FlexiPage</name>
+	</types>
+	<types>
 		<members>Utter_Sense_FAQ</members>
-		<members>Utter_Sense_FAQ_2</members>
 		<name>genaiprompttemplate</name>
+	</types>
+	<types>
+		<members>OpenAI_Settings__c</members>
+		<name>CustomObject</name>
+	</types>
+	<types>
+		<members>Utter_Sense_Permissions</members>
+		<name>PermissionSet</name>
+	</types>
+	<types>
+		<members>UtterSenseEinsteinLogo</members>
+		<name>StaticResource</name>
 	</types>
 	<version>62.0</version>
 </Package>

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<PermissionSet xmlns="http://soap.sforce.com/2006/04/metadata">
+    <customSettingAccesses>
+        <enabled>true</enabled>
+        <name>OpenAI_Settings__c</name>
+    </customSettingAccesses>
+    <description
+	>Permission set granting a user access to the foundational utter sense package features.</description>
+    <hasActivationRequired>false</hasActivationRequired>
+    <label>Utter Sense Permissions</label>
+</PermissionSet>
