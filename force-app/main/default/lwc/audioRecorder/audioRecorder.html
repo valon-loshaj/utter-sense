@@ -48,15 +48,22 @@
 		</div>
 
 		<div class="conversation-container">
-			<template if:true={transcripts.length}>
-				<div class="transcripts">
-					<template for:each={transcripts} for:item="transcript">
-						<div key={transcript.id} class="transcript-bubble">
-							{transcript.text}
+			<template if:true={conversation.length}>
+				<div class="conversation">
+					<template for:each={conversation} for:item="message">
+						<div key={message.id} class={messageClass} data-type={message.type}>
+							<div class="message-bubble">{message.text}</div>
+							<div class="message-timestamp">{message.timestamp}</div>
 						</div>
 					</template>
 				</div>
 			</template>
+
+			<div if:true={isProcessingAgentResponse} class="loading-indicator">
+				<div class="loading-bubble"></div>
+				<div class="loading-bubble"></div>
+				<div class="loading-bubble"></div>
+			</div>
 		</div>
 	</div>
 </template>

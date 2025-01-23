@@ -166,3 +166,90 @@ label {
 		transform: translateY(0);
 	}
 }
+
+.conversation {
+	display: flex;
+	flex-direction: column;
+	gap: 1rem;
+}
+
+.message {
+	display: flex;
+	flex-direction: column;
+	max-width: 80%;
+}
+
+.message[data-type="user"] {
+	align-self: flex-end;
+}
+
+.message[data-type="bot"] {
+	align-self: flex-start;
+}
+
+.message-bubble {
+	padding: 1rem;
+	border-radius: 1rem;
+	box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+	word-wrap: break-word;
+}
+
+.message[data-type="user"] .message-bubble {
+	background-color: var(--lwc-colorBrand, #0176d3);
+	color: white;
+	border-bottom-right-radius: 0;
+}
+
+.message[data-type="bot"] .message-bubble {
+	background-color: var(--lwc-colorBackground, #f3f2f2);
+	color: var(--lwc-colorTextDefault);
+	border-bottom-left-radius: 0;
+}
+
+.message-timestamp {
+	font-size: 0.75rem;
+	color: var(--lwc-colorTextWeak);
+	margin-top: 0.25rem;
+}
+
+/* Add loading indicator for bot responses */
+.message[data-type="bot"].processing .message-bubble {
+	opacity: 0.7;
+}
+
+/* Loading indicator styles */
+.loading-indicator {
+	display: flex;
+	gap: 0.5rem;
+	padding: 1rem;
+	align-items: center;
+	justify-content: center;
+}
+
+.loading-bubble {
+	width: 0.5rem;
+	height: 0.5rem;
+	background-color: var(--lwc-colorBrand, #0176d3);
+	border-radius: 50%;
+	animation: bubbleAnimation 1.4s ease-in-out infinite;
+}
+
+.loading-bubble:nth-child(2) {
+	animation-delay: 0.2s;
+}
+
+.loading-bubble:nth-child(3) {
+	animation-delay: 0.4s;
+}
+
+@keyframes bubbleAnimation {
+	0%,
+	100% {
+		transform: scale(0.75);
+		opacity: 0.5;
+	}
+	50% {
+		transform: scale(1);
+		opacity: 1;
+	}
+}

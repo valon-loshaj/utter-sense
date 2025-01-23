@@ -1,24 +1,28 @@
 import { LightningElement, track } from "lwc";
 import { AudioDeviceService } from "./audioDeviceService";
 import { WhisperService } from "./whisperService";
+import { AgentService } from "./agentService";
 import { ShowToastEvent } from "lightning/platformShowToastEvent";
 
 export default class AudioRecorder extends LightningElement {
 	@track isRecording = false;
-	@track transcripts = [];
-	@track isProcessing = false;
+	@track isTranscribing = false;
+	@track isProcessingAgentResponse = false;
 	@track audioDevices = [];
 	@track selectedDeviceId = null;
 	@track micInitialized = false;
+	@track conversation = [];
 
 	audioDeviceService;
 	whisperService;
-	transcriptId = 0;
+	agentService;
+	messageId = 0;
 
 	constructor() {
 		super();
 		this.audioDeviceService = new AudioDeviceService();
 		this.whisperService = new WhisperService();
+		this.agentService = new AgentService();
 	}
 
 	async connectedCallback() {
@@ -68,9 +72,24 @@ export default class AudioRecorder extends LightningElement {
 			window.audioStream = this.audioDeviceService.stream;
 
 			await this.whisperService.start(
-				// Success callback
-				(transcript) => {
-					this.addTranscript(transcript);
+				// Success callback for transcription
+				async (transcribedMessage) => {
+					// Add user message to conversation
+					this.addMessage(transcribedMessage, "user");
+
+					// Process agent response
+					try {
+						this.isProcessingAgentResponse = true;
+						const response =
+							await this.agentService.getAgentResponse(transcribedMessage);
+						this.addMessage(response.message, "agent");
+					} catch (error) {
+						this.handleError(
+							new Error(`Agent response error: ${error.message}`)
+						);
+					} finally {
+						this.isProcessingAgentResponse = false;
+					}
 				},
 				// Error callback
 				(error) => {
@@ -85,20 +104,23 @@ export default class AudioRecorder extends LightningElement {
 	}
 
 	stopRecording() {
-		this.isProcessing = true;
+		this.isTranscribing = true;
 		this.whisperService.stop();
 		this.isRecording = false;
 	}
 
-	addTranscript(text) {
-		this.transcripts = [
-			...this.transcripts,
+	addMessage(text, type) {
+		this.conversation = [
+			...this.conversation,
 			{
-				id: this.transcriptId++,
-				text: text.trim()
+				id: this.messageId++,
+				text: text.trim(),
+				type: type || "none",
+				timestamp: new Date().toISOString(),
+				isLoading: false
 			}
 		];
-		this.isProcessing = false;
+		this.isTranscribing = false;
 	}
 
 	handleError(error) {
@@ -110,7 +132,7 @@ export default class AudioRecorder extends LightningElement {
 				variant: "error"
 			})
 		);
-		this.isProcessing = false;
+		this.isTranscribing = false;
 		this.isRecording = false;
 	}
 
