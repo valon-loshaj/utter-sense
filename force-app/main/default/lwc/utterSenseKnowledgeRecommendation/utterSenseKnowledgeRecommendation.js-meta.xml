@@ -14,4 +14,7 @@
 			</objects>
 		</targetConfig>
 	</targetConfigs>
+	<capabilities>
+		<capability>lightning__ServiceCloudVoiceToolkitApi</capability>
+	</capabilities>
 </LightningComponentBundle>

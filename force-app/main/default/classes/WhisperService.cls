@@ -3,14 +3,14 @@
  * @author Your Name
  * @group Speech Recognition
  */
-public with sharing class WhisperController {
+public with sharing class WhisperService {
 	// TODO: Replace with Named Credentials once configured
 	private static final String WHISPER_API_ENDPOINT = 'https://api.openai.com/v1/audio/transcriptions';
 	private static final String BOUNDARY = '----WhisperFormBoundary7MA4YWxkTrZu0gW';
 	private static final String EXTRA_BOUNDARY = '--' + BOUNDARY;
 
 	/**
-	 * @description Response wrapper class for Whisper API transcription results
+	 * @description Response wrapper class for Whisper API transcription and audio generation results
 	 */
 	public class TranscriptionResponse {
 		@AuraEnabled
@@ -19,6 +19,8 @@ public with sharing class WhisperController {
 		public String language { get; set; }
 		@AuraEnabled
 		public Double duration { get; set; }
+		@AuraEnabled
+		public String audioBase64 { get; set; }
 	}
 
 	/**
@@ -107,6 +109,76 @@ public with sharing class WhisperController {
 			Logger.error('Stack Trace: ' + e.getStackTraceString());
 			throw new AuraHandledException(
 				'Error transcribing audio: ' + e.getMessage()
+			);
+		}
+	}
+
+	/**
+	 * @description Generates audio data from text using OpenAI's Text-to-Speech API
+	 * @param text The text to generate audio from
+	 * @return TranscriptionResponse containing the audio data and metadata
+	 * @throws AuraHandledException if audio generation fails
+	 */
+	@AuraEnabled
+	public static TranscriptionResponse generateAudio(String text) {
+		LoggingLevel logLevel = LoggingLevel.DEBUG;
+		Logger.debug(logLevel, '=== Starting Text-to-Speech Process ===');
+
+		try {
+			// Input validation
+			if (String.isBlank(text)) {
+				throw new WhisperAPIException('No text provided');
+			}
+
+			// Get API key
+			String apiKey = getOpenAIKey();
+
+			// Prepare request body
+			Map<String, Object> requestBody = new Map<String, Object>{
+				'model' => 'tts-1',
+				'input' => text,
+				'voice' => 'alloy', // Using 'alloy' as default voice
+				'response_format' => 'mp3'
+			};
+
+			// Prepare HTTP request
+			HttpRequest req = new HttpRequest();
+			req.setEndpoint('https://api.openai.com/v1/audio/speech');
+			req.setMethod('POST');
+			req.setHeader('Authorization', 'Bearer ' + apiKey);
+			req.setHeader('Content-Type', 'application/json');
+			req.setTimeout(120000);
+			req.setBody(JSON.serialize(requestBody));
+
+			// Send request
+			Logger.debug(logLevel, 'Sending request to OpenAI TTS API...');
+			Http http = new Http();
+			HttpResponse res = http.send(req);
+
+			// Process response
+			Logger.debug(logLevel, 'Response Status Code: ' + res.getStatusCode());
+
+			if (res.getStatusCode() == 200) {
+				// Convert binary response to base64
+				String audioBase64 = EncodingUtil.base64Encode(res.getBodyAsBlob());
+
+				TranscriptionResponse response = new TranscriptionResponse();
+				response.audioBase64 = audioBase64;
+				return response;
+			} else {
+				String errorMessage =
+					'Error calling OpenAI TTS API. Status: ' +
+					res.getStatusCode() +
+					', Response: ' +
+					res.getBody();
+				throw new WhisperAPIException(errorMessage);
+			}
+		} catch (Exception e) {
+			Logger.error('Error Type: ' + e.getTypeName());
+			Logger.error('Error Message: ' + e.getMessage());
+			Logger.error('Stack Trace: ' + e.getStackTraceString());
+			throw new AuraHandledException(
+				'Error generating audio: ' + e.getMessage()
 			);
 		}
 	}

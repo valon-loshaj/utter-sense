@@ -1,5 +1,6 @@
 import { AudioRecorderError, ErrorCodes } from "./audioRecorderError";
-import transcribeAudio from "@salesforce/apex/WhisperController.transcribeAudio";
+import transcribeAudio from "@salesforce/apex/AudioRecorderController.transcribeAudio";
+import generateAudio from "@salesforce/apex/AudioRecorderController.generateAudio";
 
 // Debug utility to safely stringify objects
 const debugLog = (label, data) => {
@@ -46,12 +47,27 @@ const debugLog = (label, data) => {
 	}
 };
 
+// Configuration for audio recording and transcription
+const CONFIG = {
+	CHUNK_INTERVAL: 500, // Reduced from 500ms for more frequent chunks
+	PROCESS_INTERVAL: 500, // Reduced from 500ms for more frequent processing
+	MIN_AUDIO_SIZE: 1024, // Reduced from 2048 bytes to process smaller chunks
+	MAX_CHUNKS_PER_PROCESS: 3, // Reduced from 5 to process smaller batches more frequently
+	TRANSCRIPTION_BUFFER_SIZE: 3, // Reduced from 3 for faster updates
+	RECORDING_FORMAT: "audio/webm"
+};
+
 export class WhisperService {
 	constructor() {
 		this.mediaRecorder = null;
 		this.audioChunks = [];
 		this._isRecording = false;
-		this.RECORDING_FORMAT = "audio/webm";
+		this.RECORDING_FORMAT = CONFIG.RECORDING_FORMAT;
+		this.transcriptionInterval = null;
+		this.currentTranscription = "";
+		this.lastProcessedChunk = 0;
+		this.transcriptionBuffer = [];
+		this.consecutiveEmptyChunks = 0; // Add counter for empty chunks
 	}
 
 	async initialize() {
@@ -59,12 +75,15 @@ export class WhisperService {
 		return true;
 	}
 
-	async start(onTranscriptionComplete, onError) {
+	async start(onTranscriptionUpdate) {
 		try {
 			this._isRecording = true;
 			this.audioChunks = [];
+			this.currentTranscription = "";
+			this.lastProcessedChunk = 0;
+			this.transcriptionBuffer = [];
+			this.consecutiveEmptyChunks = 0;
 
-			// Check if webm format is supported
 			if (!MediaRecorder.isTypeSupported(this.RECORDING_FORMAT)) {
 				throw new AudioRecorderError(
 					ErrorCodes.BROWSER_SUPPORT,
@@ -74,78 +93,121 @@ export class WhisperService {
 
 			const options = {
 				mimeType: this.RECORDING_FORMAT,
-				audioBitsPerSecond: 128000
+				audioBitsPerSecond: 256000
 			};
 
+			debugLog("Starting MediaRecorder with options", options);
+
+			if (!window.audioStream) {
+				throw new AudioRecorderError(
+					ErrorCodes.INITIALIZATION_ERROR,
+					"Audio stream not available"
+				);
+			}
+
 			this.mediaRecorder = new MediaRecorder(window.audioStream, options);
-			debugLog("MediaRecorder initialized with options", options);
+			debugLog("MediaRecorder initialized");
 
 			this.mediaRecorder.ondataavailable = (event) => {
 				if (event.data.size > 0) {
 					this.audioChunks.push(event.data);
+					this.consecutiveEmptyChunks = 0; // Reset counter on valid chunk
 					debugLog("Audio chunk collected", {
 						size: event.data.size,
-						type: event.data.type
+						type: event.data.type,
+						totalChunks: this.audioChunks.length,
+						lastProcessedChunk: this.lastProcessedChunk
+					});
+				} else {
+					this.consecutiveEmptyChunks++;
+					debugLog("Empty chunk received", {
+						consecutiveEmptyChunks: this.consecutiveEmptyChunks
 					});
 				}
 			};
 
-			this.mediaRecorder.onstop = async () => {
-				try {
-					if (this.audioChunks.length > 0) {
-						const audioBlob = new Blob(this.audioChunks, {
+			// Start periodic transcription with synchronized intervals
+			this.transcriptionInterval = setInterval(async () => {
+				if (this.audioChunks.length > this.lastProcessedChunk) {
+					try {
+						const chunksToProcess = Math.min(
+							this.audioChunks.length - this.lastProcessedChunk,
+							CONFIG.MAX_CHUNKS_PER_PROCESS
+						);
+
+						debugLog("Processing state", {
+							totalChunks: this.audioChunks.length,
+							lastProcessedChunk: this.lastProcessedChunk,
+							chunksToProcess,
+							bufferSize: this.transcriptionBuffer.length,
+							consecutiveEmptyChunks: this.consecutiveEmptyChunks
+						});
+
+						// Get chunks to process
+						const newChunks = this.audioChunks.slice(
+							this.lastProcessedChunk,
+							this.lastProcessedChunk + chunksToProcess
+						);
+
+						const audioBlob = new Blob(newChunks, {
 							type: this.RECORDING_FORMAT
 						});
-						debugLog("Audio blob created", {
+
+						debugLog("Processing audio blob", {
 							size: audioBlob.size,
-							type: audioBlob.type,
-							chunks: this.audioChunks.length
+							minRequired: CONFIG.MIN_AUDIO_SIZE,
+							willProcess: audioBlob.size >= CONFIG.MIN_AUDIO_SIZE
 						});
 
-						// check the mediaRecorder.onstop handler to make sure the audioBlob is a webm file
-						if (!audioBlob.type.includes("webm")) {
-							throw new Error(
-								`Invalid audio format: ${audioBlob.type}. Expected audio/webm`
-							);
+						// Only process if we have enough audio data
+						if (audioBlob.size >= CONFIG.MIN_AUDIO_SIZE) {
+							const base64Audio = await this.blobToBase64(audioBlob);
+
+							const response = await transcribeAudio({
+								audioBase64: base64Audio
+							});
+
+							debugLog("Transcription result", {
+								hasResponse: !!response,
+								hasText: !!response?.text,
+								originalText: response?.text
+							});
+
+							if (response && response.text) {
+								const cleanedText = this.cleanTranscriptionText(response.text);
+
+								if (cleanedText) {
+									this.updateTranscriptionBuffer(cleanedText);
+									const stableTranscription = this.getStableTranscription();
+
+									debugLog("Transcription update", {
+										cleaned: cleanedText,
+										bufferSize: this.transcriptionBuffer.length,
+										stable: stableTranscription
+									});
+
+									if (stableTranscription) {
+										this.currentTranscription = stableTranscription;
+										onTranscriptionUpdate(stableTranscription);
+									}
+								}
+							}
 						}
 
-						// Verify the blob is valid
-						if (audioBlob.size === 0) {
-							throw new Error("Generated audio blob is empty");
-						}
-
-						// Convert blob to base64
-						const base64Audio = await this.blobToBase64(audioBlob);
-						debugLog("Audio converted to base64", {
-							base64Length: base64Audio.length,
-							originalSize: audioBlob.size
-						});
-
-						// Send to server for transcription
-						const response = await transcribeAudio({
-							audioBase64: base64Audio
-						});
-						debugLog("Received transcription response", response);
-
-						if (response && response.text) {
-							onTranscriptionComplete(response.text);
-						} else {
-							throw new Error("No transcription text received");
-						}
+						// Always update the lastProcessedChunk to avoid getting stuck
+						this.lastProcessedChunk += chunksToProcess;
+					} catch (error) {
+						console.error("Real-time transcription error:", error);
+						debugLog("Transcription error", { error });
+						// Still update lastProcessedChunk to avoid getting stuck
+						this.lastProcessedChunk += 1;
 					}
-				} catch (error) {
-					debugLog("Error in onstop handler", error);
-					onError(
-						new AudioRecorderError(
-							ErrorCodes.PROCESSING_ERROR,
-							error.message || "Error processing audio",
-							{ originalError: error }
-						)
-					);
 				}
-			};
+			}, CONFIG.PROCESS_INTERVAL);
 
-			this.mediaRecorder.start(1000); // Collect data in 1-second chunks
+			debugLog("Starting MediaRecorder with config", CONFIG);
+			this.mediaRecorder.start(CONFIG.CHUNK_INTERVAL);
+			return true;
 		} catch (error) {
 			debugLog("Error starting recording", error);
 			this._isRecording = false;
@@ -157,11 +219,36 @@ export class WhisperService {
 		}
 	}
 
+	async getFinalTranscription() {
+		try {
+			if (this.audioChunks.length === 0) {
+				return "";
+			}
+
+			const audioBlob = new Blob(this.audioChunks, {
+				type: this.RECORDING_FORMAT
+			});
+
+			const base64Audio = await this.blobToBase64(audioBlob);
+			const response = await transcribeAudio({
+				audioBase64: base64Audio
+			});
+
+			return response?.text || "";
+		} catch (error) {
+			console.error("Final transcription error:", error);
+			throw error;
+		}
+	}
+
+	async generateAudio(input) {
+		return await generateAudio({ input });
+	}
+
 	blobToBase64(blob) {
 		return new Promise((resolve, reject) => {
 			const reader = new FileReader();
 			reader.onloadend = () => {
-				// Extract base64 data from the result
 				const base64String = reader.result.replace(
 					`data:${blob.type};base64,`,
 					""
@@ -181,15 +268,52 @@ export class WhisperService {
 			this.mediaRecorder.stop();
 			this._isRecording = false;
 		}
+		if (this.transcriptionInterval) {
+			clearInterval(this.transcriptionInterval);
+			this.transcriptionInterval = null;
+		}
 	}
 
 	cleanup() {
 		this.stop();
 		this.audioChunks = [];
 		this.mediaRecorder = null;
+		this.currentTranscription = "";
+		this.lastProcessedChunk = 0;
+		this.transcriptionBuffer = [];
 	}
 
 	isActive() {
 		return this._isRecording;
+	}
+
+	// Add helper method to clean transcription text
+	cleanTranscriptionText(text) {
+		if (!text) return "";
+
+		// Remove any non-printable characters
+		text = text.replace(/[^\x20-\x7E\s]/g, "");
+
+		// Remove multiple spaces
+		text = text.replace(/\s+/g, " ");
+
+		// Trim whitespace
+		return text.trim();
+	}
+
+	// Update transcription buffer with new transcription
+	updateTranscriptionBuffer(transcription) {
+		this.transcriptionBuffer.push(transcription);
+		if (this.transcriptionBuffer.length > CONFIG.TRANSCRIPTION_BUFFER_SIZE) {
+			this.transcriptionBuffer.shift();
+		}
+	}
+
+	// Get stable transcription from buffer using middle-out approach
+	getStableTranscription() {
+		if (this.transcriptionBuffer.length === 0) return "";
+
+		// Always return the latest transcription for more responsive updates
+		return this.transcriptionBuffer[this.transcriptionBuffer.length - 1];
 	}
 }
