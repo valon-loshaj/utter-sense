@@ -47,22 +47,14 @@ const debugLog = (label, data) => {
 	}
 };
 
-// New configuration parameters for refined chunking
-this.CONFIG = {
-	// MediaRecorder timeslice: how often we get chunks
-	CHUNK_INTERVAL: 500, // Reduced from 750ms for more frequent updates
-
-	// How often we process chunks for transcription
-	PROCESS_INTERVAL: 500, // Matched with CHUNK_INTERVAL for synchronization
-
-	// Minimum size of audio data to process (in bytes)
-	MIN_AUDIO_SIZE: 2048, // Increased for more meaningful speech segments
-
-	// Maximum number of chunks to process at once
-	MAX_CHUNKS_PER_PROCESS: 4, // Limit to prevent processing too much at once
-
-	// Buffer size for smooth transcription
-	TRANSCRIPTION_BUFFER_SIZE: 3
+// Configuration for audio recording and transcription
+const CONFIG = {
+	CHUNK_INTERVAL: 500, // Reduced from 500ms for more frequent chunks
+	PROCESS_INTERVAL: 500, // Reduced from 500ms for more frequent processing
+	MIN_AUDIO_SIZE: 1024, // Reduced from 2048 bytes to process smaller chunks
+	MAX_CHUNKS_PER_PROCESS: 3, // Reduced from 5 to process smaller batches more frequently
+	TRANSCRIPTION_BUFFER_SIZE: 3, // Reduced from 3 for faster updates
+	RECORDING_FORMAT: "audio/webm"
 };
 
 export class WhisperService {
