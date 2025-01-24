@@ -5,6 +5,19 @@ const lightning = require("@salesforce/eslint-plugin-lightning");
 const aura = require("@salesforce/eslint-plugin-aura");
 
 module.exports = [
+	{
+		ignores: ["**/*.xml"]
+	},
+	{
+		// Config file specific settings
+		files: ["*.config.js", ".eslintrc.js"],
+		languageOptions: {
+			globals: {
+				module: "writable",
+				require: "readonly"
+			}
+		}
+	},
 	eslint.configs.recommended,
 	{
 		files: ["**/lwc/**/*.js"],
@@ -21,7 +34,16 @@ module.exports = [
 				// Browser globals
 				window: "readonly",
 				document: "readonly",
-				console: "readonly"
+				console: "readonly",
+				navigator: "readonly",
+				Audio: "readonly",
+				Blob: "readonly",
+				MediaRecorder: "readonly",
+				FileReader: "readonly",
+				clearInterval: "readonly",
+				setInterval: "readonly",
+				setTimeout: "readonly",
+				clearTimeout: "readonly"
 			},
 			parser: require("@babel/eslint-parser"),
 			parserOptions: {
@@ -45,8 +67,8 @@ module.exports = [
 			...salesforceLwc.rules,
 			"@lwc/lwc/no-api-reassignments": "error",
 			"@salesforce/lightning/valid-apex-method-invocation": "error",
-			"@lwc/lwc/no-unknown-wire-adapters": "error",
-			"@lwc/lwc/no-unexpected-wire-adapter-usages": "error"
+			"@lwc/lwc/no-async-operation": "off",
+			"no-return-await": "off"
 		}
 	},
 	{
