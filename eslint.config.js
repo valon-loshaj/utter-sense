@@ -43,7 +43,10 @@ module.exports = [
 				clearInterval: "readonly",
 				setInterval: "readonly",
 				setTimeout: "readonly",
-				clearTimeout: "readonly"
+				clearTimeout: "readonly",
+				URL: "readonly",
+				requestAnimationFrame: "readonly",
+				atob: "readonly"
 			},
 			parser: require("@babel/eslint-parser"),
 			parserOptions: {
