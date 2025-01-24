@@ -1,5 +1,6 @@
 import { AudioRecorderError, ErrorCodes } from "./audioRecorderError";
-import transcribeAudio from "@salesforce/apex/WhisperController.transcribeAudio";
+import transcribeAudio from "@salesforce/apex/AudioRecorderController.transcribeAudio";
+import generateAudio from "@salesforce/apex/AudioRecorderController.generateAudio";
 
 // Debug utility to safely stringify objects
 const debugLog = (label, data) => {
@@ -52,6 +53,9 @@ export class WhisperService {
 		this.audioChunks = [];
 		this._isRecording = false;
 		this.RECORDING_FORMAT = "audio/webm";
+		this.transcriptionInterval = null;
+		this.currentTranscription = "";
+		this.lastProcessedChunk = 0;
 	}
 
 	async initialize() {
@@ -59,12 +63,13 @@ export class WhisperService {
 		return true;
 	}
 
-	async start(onTranscriptionComplete, onError) {
+	async start(onTranscriptionUpdate, onError) {
 		try {
 			this._isRecording = true;
 			this.audioChunks = [];
+			this.currentTranscription = "";
+			this.lastProcessedChunk = 0;
 
-			// Check if webm format is supported
 			if (!MediaRecorder.isTypeSupported(this.RECORDING_FORMAT)) {
 				throw new AudioRecorderError(
 					ErrorCodes.BROWSER_SUPPORT,
@@ -90,60 +95,32 @@ export class WhisperService {
 				}
 			};
 
-			this.mediaRecorder.onstop = async () => {
-				try {
-					if (this.audioChunks.length > 0) {
-						const audioBlob = new Blob(this.audioChunks, {
+			// Start periodic transcription
+			this.transcriptionInterval = setInterval(async () => {
+				if (this.audioChunks.length > this.lastProcessedChunk) {
+					try {
+						const newChunks = this.audioChunks.slice(this.lastProcessedChunk);
+						const audioBlob = new Blob(newChunks, {
 							type: this.RECORDING_FORMAT
 						});
-						debugLog("Audio blob created", {
-							size: audioBlob.size,
-							type: audioBlob.type,
-							chunks: this.audioChunks.length
-						});
 
-						// check the mediaRecorder.onstop handler to make sure the audioBlob is a webm file
-						if (!audioBlob.type.includes("webm")) {
-							throw new Error(
-								`Invalid audio format: ${audioBlob.type}. Expected audio/webm`
-							);
-						}
-
-						// Verify the blob is valid
-						if (audioBlob.size === 0) {
-							throw new Error("Generated audio blob is empty");
-						}
-
-						// Convert blob to base64
 						const base64Audio = await this.blobToBase64(audioBlob);
-						debugLog("Audio converted to base64", {
-							base64Length: base64Audio.length,
-							originalSize: audioBlob.size
-						});
-
-						// Send to server for transcription
 						const response = await transcribeAudio({
 							audioBase64: base64Audio
 						});
-						debugLog("Received transcription response", response);
 
 						if (response && response.text) {
-							onTranscriptionComplete(response.text);
-						} else {
-							throw new Error("No transcription text received");
+							this.currentTranscription += " " + response.text;
+							onTranscriptionUpdate(this.currentTranscription.trim());
 						}
+
+						this.lastProcessedChunk = this.audioChunks.length;
+					} catch (error) {
+						console.error("Real-time transcription error:", error);
+						// Continue recording even if transcription fails
 					}
-				} catch (error) {
-					debugLog("Error in onstop handler", error);
-					onError(
-						new AudioRecorderError(
-							ErrorCodes.PROCESSING_ERROR,
-							error.message || "Error processing audio",
-							{ originalError: error }
-						)
-					);
 				}
-			};
+			}, 2000); // Process every 2 seconds
 
 			this.mediaRecorder.start(1000); // Collect data in 1-second chunks
 		} catch (error) {
@@ -157,11 +134,36 @@ export class WhisperService {
 		}
 	}
 
+	async getFinalTranscription() {
+		try {
+			if (this.audioChunks.length === 0) {
+				return "";
+			}
+
+			const audioBlob = new Blob(this.audioChunks, {
+				type: this.RECORDING_FORMAT
+			});
+
+			const base64Audio = await this.blobToBase64(audioBlob);
+			const response = await transcribeAudio({
+				audioBase64: base64Audio
+			});
+
+			return response?.text || "";
+		} catch (error) {
+			console.error("Final transcription error:", error);
+			throw error;
+		}
+	}
+
+	async generateAudio(input) {
+		return await generateAudio({ input });
+	}
+
 	blobToBase64(blob) {
 		return new Promise((resolve, reject) => {
 			const reader = new FileReader();
 			reader.onloadend = () => {
-				// Extract base64 data from the result
 				const base64String = reader.result.replace(
 					`data:${blob.type};base64,`,
 					""
@@ -181,12 +183,18 @@ export class WhisperService {
 			this.mediaRecorder.stop();
 			this._isRecording = false;
 		}
+		if (this.transcriptionInterval) {
+			clearInterval(this.transcriptionInterval);
+			this.transcriptionInterval = null;
+		}
 	}
 
 	cleanup() {
 		this.stop();
 		this.audioChunks = [];
 		this.mediaRecorder = null;
+		this.currentTranscription = "";
+		this.lastProcessedChunk = 0;
 	}
 
 	isActive() {

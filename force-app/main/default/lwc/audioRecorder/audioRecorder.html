@@ -51,8 +51,20 @@
 			<template if:true={conversation.length}>
 				<div class="conversation">
 					<template for:each={conversation} for:item="message">
-						<div key={message.id} class={messageClass} data-type={message.type}>
-							<div class="message-bubble">{message.text}</div>
+						<div key={message.id} class="message" data-type={message.type}>
+							<div class="user-name">{message.userName}</div>
+							<div class="message-bubble">
+								{message.text}
+								<template if:true={message.isAgentMessage}>
+									<div class="audio-controls">
+										<div class={audioIndicatorClass}>
+											<span></span>
+											<span></span>
+											<span></span>
+										</div>
+									</div>
+								</template>
+							</div>
 							<div class="message-timestamp">{message.timestamp}</div>
 						</div>
 					</template>

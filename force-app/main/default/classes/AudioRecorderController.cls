@@ -5,6 +5,28 @@ public with sharing class AudioRecorderController {
 		return response;
 	}
 
+	@AuraEnabled
+	public static WhisperService.TranscriptionResponse transcribeAudio(
+		String audioBase64
+	) {
+		try {
+			return WhisperService.transcribeAudio(audioBase64);
+		} catch (Exception e) {
+			throw new AuraHandledException(e.getMessage());
+		}
+	}
+
+	@AuraEnabled
+	public static WhisperService.TranscriptionResponse generateAudio(
+		String input
+	) {
+		try {
+			return WhisperService.generateAudio(input);
+		} catch (Exception e) {
+			throw new AuraHandledException(e.getMessage());
+		}
+	}
+
 	public class AgentResponse {
 		@AuraEnabled
 		public String message;
