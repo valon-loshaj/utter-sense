@@ -36,10 +36,10 @@
 
 			<button
 				class="stop-button"
-				onclick={stopRecording}
+				onclick={handleStopClick}
 				disabled={stopButtonDisabled}
 			>
-				Stop Recording
+				Stop Conversation
 			</button>
 		</div>
 
@@ -87,6 +87,12 @@
 				<div class="loading-bubble"></div>
 				<div class="loading-bubble"></div>
 			</div>
+		</div>
+
+		<div class={silenceIndicatorClass} if:true={isRecording}>
+			<div class="countdown-circle"></div>
+			<div class="countdown-progress" style={silenceProgressStyle}></div>
+			<span>{silenceCountdown}</span>
 		</div>
 	</div>
 </template>
