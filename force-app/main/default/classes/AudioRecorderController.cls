@@ -1,8 +1,87 @@
 public with sharing class AudioRecorderController {
 	@AuraEnabled
 	public static AgentResponse getAgentResponse(String input) {
-		AgentResponse response = new AgentResponse('Hello, world!', null);
-		return response;
+		try {
+			System.debug('getAgentResponse - Input received: ' + input);
+
+			if (String.isBlank(input)) {
+				System.debug('getAgentResponse - Input is blank or null');
+				return new AgentResponse(null, 'Input text cannot be blank');
+			}
+
+			try {
+				// Create inputs that are needed for the prompt template to be resolved
+				ConnectApi.WrappedValue searchText = new ConnectApi.WrappedValue();
+				searchText.value = input;
+				Map<String, ConnectApi.WrappedValue> inputParams = new Map<String, ConnectApi.WrappedValue>();
+				inputParams.put('Input:searchText', searchText);
+
+				System.debug(
+					'getAgentResponse - Input params prepared: ' + inputParams
+				);
+
+				ConnectApi.EinsteinPromptTemplateGenerationsInput executeTemplateInput = new ConnectApi.EinsteinPromptTemplateGenerationsInput();
+				executeTemplateInput.additionalConfig = new ConnectApi.EinsteinLlmAdditionalConfigInput();
+				executeTemplateInput.additionalConfig.applicationName = 'PromptBuilderPreview';
+				executeTemplateInput.additionalConfig.numGenerations = 1;
+				executeTemplateInput.isPreview = false;
+				executeTemplateInput.inputParams = inputParams;
+
+				System.debug(
+					'getAgentResponse - Template input prepared: ' + executeTemplateInput
+				);
+
+				// Generate the agent response
+				ConnectApi.EinsteinPromptTemplateGenerationsRepresentation generationsOutput = ConnectApi.EinsteinLLM.generateMessagesForPromptTemplate(
+					'Utter_Sense_FAQ',
+					executeTemplateInput
+				);
+
+				System.debug(
+					'getAgentResponse - Raw Einstein response received: ' +
+					generationsOutput
+				);
+
+				if (
+					generationsOutput.generations == null ||
+					generationsOutput.generations.isEmpty()
+				) {
+					System.debug(
+						LoggingLevel.ERROR,
+						'getAgentResponse - No generations returned from Einstein'
+					);
+					return new AgentResponse(null, 'No response generated from AI model');
+				}
+
+				// Handle the response
+				ConnectApi.EinsteinLLMGenerationItemOutput einsteinResponse = generationsOutput.generations[0];
+				String textResponse = einsteinResponse.text;
+
+				System.debug('getAgentResponse - Final text response: ' + textResponse);
+
+				// Return the response
+				return new AgentResponse(textResponse, null);
+			} catch (ConnectApi.ConnectApiException e) {
+				System.debug(
+					LoggingLevel.ERROR,
+					'getAgentResponse - Einstein API Error: ' +
+						e.getMessage() +
+						'\nStack trace: ' +
+						e.getStackTraceString()
+				);
+				return new AgentResponse(null, 'Einstein API Error: ' + e.getMessage());
+			}
+		} catch (Exception e) {
+			System.debug(
+				'getAgentResponse - Unexpected error: ' +
+					e.getMessage() +
+					'\nStack trace: ' +
+					e.getStackTraceString()
+			);
+			throw new AuraHandledException(
+				'An unexpected error occurred: ' + e.getMessage()
+			);
+		}
 	}
 
 	@AuraEnabled
@@ -10,8 +89,24 @@ public with sharing class AudioRecorderController {
 		String audioBase64
 	) {
 		try {
-			return WhisperService.transcribeAudio(audioBase64);
+			System.debug(
+				'transcribeAudio - Starting transcription. Audio length: ' +
+				(audioBase64 != null ? audioBase64.length() : 0)
+			);
+			WhisperService.TranscriptionResponse response = WhisperService.transcribeAudio(
+				audioBase64
+			);
+			System.debug(
+				'transcribeAudio - Transcription completed successfully: ' + response
+			);
+			return response;
 		} catch (Exception e) {
+			System.debug(
+				'transcribeAudio - Error occurred: ' +
+					e.getMessage() +
+					'\nStack trace: ' +
+					e.getStackTraceString()
+			);
 			throw new AuraHandledException(e.getMessage());
 		}
 	}
@@ -21,8 +116,23 @@ public with sharing class AudioRecorderController {
 		String input
 	) {
 		try {
-			return WhisperService.generateAudio(input);
+			System.debug(
+				'generateAudio - Starting audio generation with input: ' + input
+			);
+			WhisperService.TranscriptionResponse response = WhisperService.generateAudio(
+				input
+			);
+			System.debug(
+				'generateAudio - Audio generation completed successfully: ' + response
+			);
+			return response;
 		} catch (Exception e) {
+			System.debug(
+				'generateAudio - Error occurred: ' +
+					e.getMessage() +
+					'\nStack trace: ' +
+					e.getStackTraceString()
+			);
 			throw new AuraHandledException(e.getMessage());
 		}
 	}
@@ -37,6 +147,12 @@ public with sharing class AudioRecorderController {
 		public AgentResponse(String message, String error) {
 			this.message = message;
 			this.error = error;
+			System.debug(
+				'AgentResponse - Created new response. Message: ' +
+					message +
+					', Error: ' +
+					error
+			);
 		}
 	}
 }
