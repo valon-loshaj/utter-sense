@@ -97,6 +97,11 @@ export default class AudioRecorder extends LightningElement {
 				throw new Error("Please initialize the microphone first");
 			}
 
+			// Clean up any existing transcription bubbles first
+			this.conversation = this.conversation.filter(
+				(msg) => msg.type !== "current-transcription"
+			);
+
 			// Share the audio stream with the WhisperService
 			window.audioStream = this.audioDeviceService.stream;
 
@@ -134,7 +139,7 @@ export default class AudioRecorder extends LightningElement {
 			this.whisperService.stop();
 			this.isRecording = false;
 
-			// Remove the real-time transcription bubble with fade out effect
+			// Remove any existing real-time transcription bubble immediately
 			const currentTranscriptionMessage = this.conversation.find(
 				(msg) => msg.type === "current-transcription"
 			);
@@ -148,7 +153,7 @@ export default class AudioRecorder extends LightningElement {
 				await new Promise((resolve) => setTimeout(resolve, 300));
 			}
 
-			// Remove the real-time transcription bubble
+			// Clean up the conversation by removing any transcription messages
 			this.conversation = this.conversation.filter(
 				(msg) => msg.type !== "current-transcription"
 			);
@@ -156,6 +161,13 @@ export default class AudioRecorder extends LightningElement {
 			// Get final transcription
 			const finalTranscription =
 				await this.whisperService.getFinalTranscription();
+
+			// Create a new conversation array without transcription messages and add the final message
+			const cleanedConversation = this.conversation.filter(
+				(msg) => msg.type !== "current-transcription"
+			);
+
+			this.conversation = cleanedConversation;
 
 			// Add user's final message to conversation with fade in
 			this.addMessage(finalTranscription, "user", true);
@@ -185,6 +197,11 @@ export default class AudioRecorder extends LightningElement {
 			} catch (error) {
 				console.error("Error generating audio:", error);
 			}
+
+			// One final cleanup before adding agent response
+			this.conversation = this.conversation.filter(
+				(msg) => msg.type !== "current-transcription"
+			);
 
 			// Add agent response with fade in
 			this.addMessage(response.message, "agent", true);

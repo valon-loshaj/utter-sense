@@ -49,11 +49,12 @@ const debugLog = (label, data) => {
 
 // Configuration for audio recording and transcription
 const CONFIG = {
-	CHUNK_INTERVAL: 500, // Reduced from 500ms for more frequent chunks
-	PROCESS_INTERVAL: 500, // Reduced from 500ms for more frequent processing
-	MIN_AUDIO_SIZE: 1024, // Reduced from 2048 bytes to process smaller chunks
-	MAX_CHUNKS_PER_PROCESS: 3, // Reduced from 5 to process smaller batches more frequently
-	TRANSCRIPTION_BUFFER_SIZE: 3, // Reduced from 3 for faster updates
+	CHUNK_INTERVAL: 1000, // Increased to 1 second to get more substantial chunks
+	PROCESS_INTERVAL: 2000, // Process every 2 seconds to allow more context
+	MIN_AUDIO_SIZE: 1024, // Keep minimum size the same
+	MAX_CHUNKS_PER_PROCESS: 30, // Increased to allow more chunks to be processed
+	SLIDING_WINDOW_SIZE: 60, // Increased to maintain 60 seconds of context (with 1s chunks)
+	TRANSCRIPTION_BUFFER_SIZE: 20, // Increased buffer size for longer transcriptions
 	RECORDING_FORMAT: "audio/webm"
 };
 
@@ -111,7 +112,7 @@ export class WhisperService {
 			this.mediaRecorder.ondataavailable = (event) => {
 				if (event.data.size > 0) {
 					this.audioChunks.push(event.data);
-					this.consecutiveEmptyChunks = 0; // Reset counter on valid chunk
+					this.consecutiveEmptyChunks = 0;
 					debugLog("Audio chunk collected", {
 						size: event.data.size,
 						type: event.data.type,
@@ -130,26 +131,27 @@ export class WhisperService {
 			this.transcriptionInterval = setInterval(async () => {
 				if (this.audioChunks.length > this.lastProcessedChunk) {
 					try {
-						const chunksToProcess = Math.min(
-							this.audioChunks.length - this.lastProcessedChunk,
-							CONFIG.MAX_CHUNKS_PER_PROCESS
+						// Calculate the window of chunks to process
+						const windowStart = Math.max(
+							0,
+							this.audioChunks.length - CONFIG.SLIDING_WINDOW_SIZE
 						);
+						const windowEnd = this.audioChunks.length;
 
 						debugLog("Processing state", {
 							totalChunks: this.audioChunks.length,
-							lastProcessedChunk: this.lastProcessedChunk,
-							chunksToProcess,
+							windowStart,
+							windowEnd,
 							bufferSize: this.transcriptionBuffer.length,
 							consecutiveEmptyChunks: this.consecutiveEmptyChunks
 						});
 
-						// Get chunks to process
-						const newChunks = this.audioChunks.slice(
-							this.lastProcessedChunk,
-							this.lastProcessedChunk + chunksToProcess
+						// Get chunks within the sliding window
+						const chunksToProcess = this.audioChunks.slice(
+							windowStart,
+							windowEnd
 						);
-
-						const audioBlob = new Blob(newChunks, {
+						const audioBlob = new Blob(chunksToProcess, {
 							type: this.RECORDING_FORMAT
 						});
 
@@ -194,13 +196,13 @@ export class WhisperService {
 							}
 						}
 
-						// Always update the lastProcessedChunk to avoid getting stuck
-						this.lastProcessedChunk += chunksToProcess;
+						// Update the last processed chunk
+						this.lastProcessedChunk = windowEnd;
 					} catch (error) {
 						console.error("Real-time transcription error:", error);
 						debugLog("Transcription error", { error });
 						// Still update lastProcessedChunk to avoid getting stuck
-						this.lastProcessedChunk += 1;
+						this.lastProcessedChunk = this.audioChunks.length;
 					}
 				}
 			}, CONFIG.PROCESS_INTERVAL);
