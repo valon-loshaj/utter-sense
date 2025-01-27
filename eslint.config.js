@@ -103,5 +103,20 @@ module.exports = [
 			"@salesforce/aura/no-deprecated-apis": "error",
 			"@salesforce/aura/no-async-operation": "error"
 		}
+	},
+	{
+		files: ["*.html"],
+		rules: {
+			"css-rcurlyexpected": "off",
+			"css-ruleorselectorexpected": "off",
+			emptyRules: "off"
+		}
+	},
+	{
+		files: ["**/lwc/**/*.js"],
+		rules: {
+			"@lwc/lwc/no-inner-html": "off",
+			"no-console": "off"
+		}
 	}
 ];

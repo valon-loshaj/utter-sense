@@ -25,5 +25,21 @@
 		"**/.settings": true,
 		"**/.exchange_modules_tmp": true,
 		".mule": true
-	}
+	},
+	"salesforcedx-vscode-core.show-cli-success-msg": false,
+	"css.validate": true,
+	"css.lint.emptyRules": "ignore",
+	"html.validate.styles": false,
+	"eslint.validate": ["javascript", "javascriptreact", "html"],
+	"[html]": {
+		"editor.defaultFormatter": "esbenp.prettier-vscode"
+	},
+	"[javascript]": {
+		"editor.defaultFormatter": "esbenp.prettier-vscode"
+	},
+	"[json]": {
+		"editor.defaultFormatter": "esbenp.prettier-vscode"
+	},
+	"prettier.documentSelectors": ["**/*.html", "**/*.js", "**/*.json"],
+	"prettier.requireConfig": true
 }

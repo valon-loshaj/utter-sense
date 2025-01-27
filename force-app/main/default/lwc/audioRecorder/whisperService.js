@@ -91,7 +91,10 @@ export class WhisperService {
 			this.isFirstTranscription = true;
 
 			if (!MediaRecorder.isTypeSupported(this.RECORDING_FORMAT)) {
-				throw new Error("WebM audio format is not supported by your browser");
+				throw new AudioRecorderError(
+					ErrorCodes.BROWSER_SUPPORT,
+					"WebM audio format is not supported by your browser"
+				);
 			}
 
 			const options = {
@@ -100,7 +103,10 @@ export class WhisperService {
 			};
 
 			if (!window.audioStream) {
-				throw new Error("Audio stream not available");
+				throw new AudioRecorderError(
+					ErrorCodes.INITIALIZATION_ERROR,
+					"Audio stream not available"
+				);
 			}
 
 			this.mediaRecorder = new MediaRecorder(window.audioStream, options);
@@ -133,10 +139,7 @@ export class WhisperService {
 						const windowEnd = this.audioChunks.length;
 
 						// Get chunks within the sliding window
-						const chunksToProcess = this.audioChunks.slice(
-							windowStart,
-							windowEnd
-						);
+						const chunksToProcess = this.audioChunks.slice(windowStart, windowEnd);
 						const audioBlob = new Blob(chunksToProcess, {
 							type: this.RECORDING_FORMAT
 						});
@@ -146,6 +149,12 @@ export class WhisperService {
 							const base64Audio = await this.blobToBase64(audioBlob);
 							const response = await transcribeAudio({
 								audioBase64: base64Audio
+							}).catch((error) => {
+								throw new AudioRecorderError(
+									ErrorCodes.NETWORK_ERROR,
+									"Failed to transcribe audio",
+									{ originalError: error }
+								);
 							});
 
 							if (response && response.text) {
@@ -173,8 +182,17 @@ export class WhisperService {
 						// Update the last processed chunk
 						this.lastProcessedChunk = windowEnd;
 					} catch (error) {
-						console.error("Real-time transcription error:", error);
-						if (onError) onError(error);
+						if (onError) {
+							onError(
+								error instanceof AudioRecorderError
+									? error
+									: new AudioRecorderError(
+											ErrorCodes.DEVICE_ERROR,
+											"Transcription error occurred",
+											{ originalError: error }
+										)
+							);
+						}
 						this.lastProcessedChunk = this.audioChunks.length;
 					}
 				}
@@ -188,7 +206,11 @@ export class WhisperService {
 			return true;
 		} catch (error) {
 			this._isRecording = false;
-			throw error;
+			throw error instanceof AudioRecorderError
+				? error
+				: new AudioRecorderError(ErrorCodes.DEVICE_ERROR, "Failed to start recording", {
+						originalError: error
+					});
 		}
 	}
 
@@ -205,12 +227,21 @@ export class WhisperService {
 			const base64Audio = await this.blobToBase64(audioBlob);
 			const response = await transcribeAudio({
 				audioBase64: base64Audio
+			}).catch((error) => {
+				throw new AudioRecorderError(
+					ErrorCodes.NETWORK_ERROR,
+					"Failed to get final transcription",
+					{ originalError: error }
+				);
 			});
 
 			return response?.text || "";
 		} catch (error) {
-			console.error("Final transcription error:", error);
-			throw error;
+			throw error instanceof AudioRecorderError
+				? error
+				: new AudioRecorderError(ErrorCodes.DEVICE_ERROR, "Final transcription error", {
+						originalError: error
+					});
 		}
 	}
 
@@ -222,10 +253,7 @@ export class WhisperService {
 		return new Promise((resolve, reject) => {
 			const reader = new FileReader();
 			reader.onloadend = () => {
-				const base64String = reader.result.replace(
-					`data:${blob.type};base64,`,
-					""
-				);
+				const base64String = reader.result.replace(`data:${blob.type};base64,`, "");
 				resolve(base64String);
 			};
 			reader.onerror = (error) => {
