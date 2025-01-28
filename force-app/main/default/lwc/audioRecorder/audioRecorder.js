@@ -1,7 +1,7 @@
 import { LightningElement, track, wire } from "lwc";
 import { AudioDeviceService } from "./audioDeviceService";
 import { WhisperService } from "./whisperService";
-import { AgentService } from "./agentService";
+import { MessagingService } from "./messagingService";
 import { ShowToastEvent } from "lightning/platformShowToastEvent";
 import { getRecord } from "lightning/uiRecordApi";
 import { SilenceDetectionService } from "./silenceDetectionService";
@@ -26,7 +26,7 @@ export default class AudioRecorder extends LightningElement {
 
 	audioDeviceService;
 	whisperService;
-	agentService;
+	messagingService;
 	silenceDetectionService;
 	messageId = 0;
 	audioElement;
@@ -45,15 +45,14 @@ export default class AudioRecorder extends LightningElement {
 		super();
 		this.audioDeviceService = new AudioDeviceService();
 		this.whisperService = new WhisperService();
-		this.agentService = new AgentService();
+		this.messagingService = new MessagingService();
 		this.silenceDetectionService = new SilenceDetectionService();
 	}
 
 	async connectedCallback() {
 		try {
 			// Only enumerate devices without initializing the stream
-			this.audioDevices =
-				await this.audioDeviceService.getAvailableDevices(false);
+			this.audioDevices = await this.audioDeviceService.getAvailableDevices(false);
 
 			// Initialize audio element
 			this.audioElement = new Audio();
@@ -62,9 +61,7 @@ export default class AudioRecorder extends LightningElement {
 			});
 
 			// Initialize the conversation container reference
-			this.conversationContainer = this.template.querySelector(
-				".conversation-container"
-			);
+			this.conversationContainer = this.template.querySelector(".conversation-container");
 		} catch (error) {
 			this.handleError(error);
 		}
@@ -83,6 +80,7 @@ export default class AudioRecorder extends LightningElement {
 
 			await this.audioDeviceService.initialize(this.selectedDeviceId);
 			await this.whisperService.initialize();
+			await this.messagingService.initialize();
 			this.micInitialized = true;
 
 			this.dispatchEvent(
@@ -116,13 +114,10 @@ export default class AudioRecorder extends LightningElement {
 			window.audioStream = this.audioDeviceService.stream;
 
 			// Initialize and start silence detection
-			await this.silenceDetectionService.initialize(
-				this.audioDeviceService.stream,
-				{
-					onSilenceDetected: () => this.handleSilenceDetected(),
-					onSilenceProgress: (duration) => this.handleSilenceProgress(duration)
-				}
-			);
+			await this.silenceDetectionService.initialize(this.audioDeviceService.stream, {
+				onSilenceDetected: () => this.handleSilenceDetected(),
+				onSilenceProgress: (duration) => this.handleSilenceProgress(duration)
+			});
 			this.silenceDetectionService.start();
 
 			// Reset current transcription
@@ -187,8 +182,7 @@ export default class AudioRecorder extends LightningElement {
 			);
 
 			// Get final transcription
-			const finalTranscription =
-				await this.whisperService.getFinalTranscription();
+			const finalTranscription = await this.whisperService.getFinalTranscription();
 
 			// Only proceed if we have a valid transcription
 			if (finalTranscription && finalTranscription.trim()) {
@@ -204,22 +198,18 @@ export default class AudioRecorder extends LightningElement {
 
 				// Start processing agent response
 				this.isProcessingAgentResponse = true;
-				const response =
-					await this.agentService.getAgentResponse(finalTranscription);
 
-				// Generate audio from the agent's response
+				// Send message to bot and get response
+				const botResponse = await this.messagingService.sendMessage(finalTranscription);
+
+				// Generate audio from the bot's response
 				try {
-					console.log("Generating audio for response:", response.message);
-					const audioResponse = await this.whisperService.generateAudio(
-						response.message
-					);
+					console.log("Generating audio for response:", botResponse.text);
+					const audioResponse = await this.whisperService.generateAudio(botResponse.text);
 					console.log("Audio response received:", audioResponse);
 
 					if (audioResponse && audioResponse.audioBase64) {
-						const audioBlob = this.base64ToBlob(
-							audioResponse.audioBase64,
-							"audio/mp3"
-						);
+						const audioBlob = this.base64ToBlob(audioResponse.audioBase64, "audio/mp3");
 						const audioUrl = URL.createObjectURL(audioBlob);
 						console.log("Created audio URL:", audioUrl);
 						this.playAudioResponse(audioUrl);
@@ -240,7 +230,7 @@ export default class AudioRecorder extends LightningElement {
 				);
 
 				// Add agent response with fade in
-				this.addMessage(response.message, "agent", true);
+				this.addMessage(botResponse.text, "agent", true);
 				this.isProcessingAgentResponse = false;
 			} else {
 				// If no valid transcription, just restart recording
@@ -380,9 +370,7 @@ export default class AudioRecorder extends LightningElement {
 
 	// Add getter for record button label
 	get recordButtonLabel() {
-		return this.isRecording
-			? "Conversation in progress..."
-			: "Start Conversation";
+		return this.isRecording ? "Conversation in progress..." : "Start Conversation";
 	}
 
 	// Existing getter for disabling record button
@@ -406,12 +394,8 @@ export default class AudioRecorder extends LightningElement {
 			this.audioElement.removeEventListener("ended", this.handleAudioEnded);
 
 			// Add event listeners for debugging and auto-restart
-			this.audioElement.addEventListener("canplay", () =>
-				console.log("Audio can play")
-			);
-			this.audioElement.addEventListener("error", (e) =>
-				console.error("Audio error:", e)
-			);
+			this.audioElement.addEventListener("canplay", () => console.log("Audio can play"));
+			this.audioElement.addEventListener("error", (e) => console.error("Audio error:", e));
 
 			// Add event listener for audio completion
 			this.audioElement.addEventListener("ended", () => {
@@ -523,9 +507,7 @@ export default class AudioRecorder extends LightningElement {
 		}
 
 		// Clean up any ongoing transcription messages
-		this.conversation = this.conversation.filter(
-			(msg) => msg.type !== "current-transcription"
-		);
+		this.conversation = this.conversation.filter((msg) => msg.type !== "current-transcription");
 
 		// Add a message indicating the conversation was stopped
 		this.addMessage("Conversation stopped by user", "system", true);
