@@ -18,6 +18,8 @@ export class MessagingService {
 				throw new Error(newConversationResponse.error);
 			}
 
+			console.log("Conversation created successfully:", newConversationResponse);
+
 			this.conversationId = newConversationResponse.conversationId;
 			this.lastMessageId = newConversationResponse.messageId;
 			this.accessToken = accessTokenResponse.accessToken;
@@ -26,6 +28,21 @@ export class MessagingService {
 			return true;
 		} catch (error) {
 			console.error("Failed to initialize messaging service:", error);
+			throw error;
+		}
+	}
+
+	async createConversation() {
+		try {
+			const response = await createConversation();
+			if (response.error) {
+				throw new Error(response.error);
+			}
+			this.conversationId = response.conversationId;
+			this.lastMessageId = response.messageId;
+			return response;
+		} catch (error) {
+			console.error("Error creating conversation:", error);
 			throw error;
 		}
 	}

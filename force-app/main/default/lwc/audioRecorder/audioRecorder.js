@@ -82,9 +82,8 @@ export default class AudioRecorder extends LightningElement {
 			await this.whisperService.initialize();
 			await this.messagingService.initialize();
 
-			// Create a new conversation
-			const conversationResponse = await this.messagingService.createConversation();
-			this.conversationId = conversationResponse.conversationId;
+			// The conversation is already created in messagingService.initialize()
+			this.conversationId = this.messagingService.conversationId;
 
 			this.micInitialized = true;
 
