@@ -81,6 +81,11 @@ export default class AudioRecorder extends LightningElement {
 			await this.audioDeviceService.initialize(this.selectedDeviceId);
 			await this.whisperService.initialize();
 			await this.messagingService.initialize();
+
+			// Create a new conversation
+			const conversationResponse = await this.messagingService.createConversation();
+			this.conversationId = conversationResponse.conversationId;
+
 			this.micInitialized = true;
 
 			this.dispatchEvent(
@@ -200,7 +205,15 @@ export default class AudioRecorder extends LightningElement {
 				this.isProcessingAgentResponse = true;
 
 				// Send message to bot and get response
-				const botResponse = await this.messagingService.sendMessage(finalTranscription);
+				console.log("Sending message to agent:", finalTranscription);
+				const response = await this.messagingService.sendMessage(finalTranscription);
+
+				console.log("Received response from agent:", response);
+
+				const botResponse = {
+					text: response.text,
+					messageId: response.messageId
+				};
 
 				// Generate audio from the bot's response
 				try {

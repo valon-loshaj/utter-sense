@@ -1,22 +1,28 @@
-export class MessagingService {
-	constructor() {
-		this.conversationId = null;
-		this.lastMessageId = null;
-		this.orgId = "00DdL00000JGsXn";
-		this.botDeveloperName = "Utter_Sense_ES";
-		this.accessToken = null;
-		this.tokenType = null;
-		this.tokenExpiry = null;
-		this.baseUrl =
-			"https://orgfarm-0f131521a0-dev-ed.develop.my.salesforce-scrt.com/iamessage/api/v2";
-		this.authUrl =
-			"https://orgfarm-0f131521a0-dev-ed.develop.my.salesforce-scrt.com/services/oauth2/token";
-	}
+import getAccessToken from "@salesforce/apex/AudioRecorderController.getAccessToken";
+import createConversation from "@salesforce/apex/AudioRecorderController.createConversation";
+import sendMessage from "@salesforce/apex/AudioRecorderController.sendMessage";
 
+export class MessagingService {
 	async initialize() {
 		try {
-			await this.getAccessToken();
-			await this.createConversation();
+			const accessTokenResponse = await getAccessToken();
+			const newConversationResponse = await createConversation();
+
+			if (accessTokenResponse.error) {
+				console.log("Error getting access token:", accessTokenResponse.error);
+				throw new Error(accessTokenResponse.error);
+			}
+
+			if (newConversationResponse.error) {
+				console.log("Error creating conversation:", newConversationResponse.error);
+				throw new Error(newConversationResponse.error);
+			}
+
+			this.conversationId = newConversationResponse.conversationId;
+			this.lastMessageId = newConversationResponse.messageId;
+			this.accessToken = accessTokenResponse.accessToken;
+			this.tokenType = accessTokenResponse.tokenType;
+			this.tokenExpiry = accessTokenResponse.tokenExpiry;
 			return true;
 		} catch (error) {
 			console.error("Failed to initialize messaging service:", error);
@@ -69,63 +75,35 @@ export class MessagingService {
 		}
 	}
 
-	async createConversation() {
-		try {
-			const response = await fetch(`${this.baseUrl}/conversation`, {
-				method: "POST",
-				headers: {
-					Authorization: `${this.tokenType} ${this.accessToken}`,
-					"Content-Type": "application/json"
-				},
-				body: JSON.stringify({
-					botDeveloperName: this.botDeveloperName,
-					clientType: "UtterSense_AudioRecorder",
-					clientVersion: "1.0.0"
-				})
-			});
-
-			if (!response.ok) {
-				throw new Error(`Failed to create conversation: ${response.statusText}`);
-			}
-
-			const data = await response.json();
-			this.conversationId = data.conversationId;
-			this.lastMessageId = data.messageId;
-			return data;
-		} catch (error) {
-			console.error("Error creating conversation:", error);
-			throw error;
-		}
-	}
-
 	async sendMessage(text) {
 		try {
-			if (this.isTokenExpired()) {
-				await this.getAccessToken();
+			if (!this.conversationId) {
+				throw new Error("Conversation not initialized");
 			}
 
-			const response = await fetch(
-				`${this.baseUrl}/conversation/${this.conversationId}/message`,
-				{
-					method: "POST",
-					headers: {
-						Authorization: `${this.tokenType} ${this.accessToken}`,
-						"Content-Type": "application/json"
-					},
-					body: JSON.stringify({
-						text: text,
-						replyToMessageId: this.lastMessageId
-					})
-				}
-			);
+			console.log("Sending message:", {
+				conversationId: this.conversationId,
+				text: text,
+				replyToMessageId: this.lastMessageId
+			});
 
-			if (!response.ok) {
-				throw new Error(`Failed to send message: ${response.statusText}`);
+			const response = await sendMessage({
+				conversationId: this.conversationId,
+				message: text,
+				replyToMessageId: this.lastMessageId
+			});
+
+			if (response.error) {
+				console.error("Error from sendMessage:", response.error);
+				throw new Error(response.error);
 			}
 
-			const data = await response.json();
-			this.lastMessageId = data.messageId;
-			return data;
+			console.log("Message sent successfully:", response);
+			this.lastMessageId = response.messageId;
+			return {
+				messageId: response.messageId,
+				text: response.text
+			};
 		} catch (error) {
 			console.error("Error sending message:", error);
 			throw error;

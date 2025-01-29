@@ -20,6 +20,14 @@
 		{
 			"files": "*.{cmp,page,component}",
 			"options": { "parser": "html" }
+		},
+		{
+			"files": "*.cls",
+			"options": { "parser": "apex" }
+		},
+		{
+			"files": "*.cls-meta.xml",
+			"options": { "parser": "xml" }
 		}
 	]
 }
