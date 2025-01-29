@@ -80,10 +80,12 @@ export default class AudioRecorder extends LightningElement {
 
 			await this.audioDeviceService.initialize(this.selectedDeviceId);
 			await this.whisperService.initialize();
+
+			// Initialize messaging service and store conversation details
 			await this.messagingService.initialize();
 
-			// The conversation is already created in messagingService.initialize()
-			this.conversationId = this.messagingService.conversationId;
+			// Add a system message to show the conversation started
+			this.addMessage("Conversation initialized successfully", "system", true);
 
 			this.micInitialized = true;
 
@@ -96,12 +98,29 @@ export default class AudioRecorder extends LightningElement {
 			);
 		} catch (error) {
 			this.handleError(error);
+			// If there's an error with messaging service, we should clean up
+			this.cleanup();
+		}
+	}
+
+	// Add a cleanup method
+	cleanup() {
+		this.micInitialized = false;
+		this.isRecording = false;
+		this.isProcessingAgentResponse = false;
+		this.whisperService.cleanup();
+		this.audioDeviceService.cleanup();
+		this.silenceDetectionService.cleanup();
+		if (this.audioElement) {
+			this.audioElement.pause();
+			this.audioElement.src = "";
 		}
 	}
 
 	async startRecording() {
 		this.isManualStop = false;
 		try {
+			// Check if the microphone is initialized
 			if (!this.micInitialized) {
 				throw new Error("Please initialize the microphone first");
 			}
@@ -203,60 +222,81 @@ export default class AudioRecorder extends LightningElement {
 				// Start processing agent response
 				this.isProcessingAgentResponse = true;
 
-				// Send message to bot and get response
-				console.log("Sending message to agent:", finalTranscription);
-				const response = await this.messagingService.sendMessage(finalTranscription);
-
-				console.log("Received response from agent:", response);
-
-				const botResponse = {
-					text: response.text,
-					messageId: response.messageId
-				};
-
-				// Generate audio from the bot's response
 				try {
-					console.log("Generating audio for response:", botResponse.text);
-					const audioResponse = await this.whisperService.generateAudio(botResponse.text);
-					console.log("Audio response received:", audioResponse);
+					// Send message to bot and get response
+					console.log("Sending message to agent:", finalTranscription);
+					const response = await this.messagingService.sendMessage(finalTranscription);
 
-					if (audioResponse && audioResponse.audioBase64) {
-						const audioBlob = this.base64ToBlob(audioResponse.audioBase64, "audio/mp3");
-						const audioUrl = URL.createObjectURL(audioBlob);
-						console.log("Created audio URL:", audioUrl);
-						this.playAudioResponse(audioUrl);
+					if (response.text) {
+						console.log("Received response from agent:", response);
+						// Generate audio from the bot's response
+						try {
+							console.log("Generating audio for response:", response.text);
+							const audioResponse = await this.whisperService.generateAudio(
+								response.text
+							);
+							console.log("Audio response received:", audioResponse);
+
+							if (audioResponse && audioResponse.audioBase64) {
+								const audioBlob = this.base64ToBlob(
+									audioResponse.audioBase64,
+									"audio/mp3"
+								);
+								const audioUrl = URL.createObjectURL(audioBlob);
+								console.log("Created audio URL:", audioUrl);
+								await this.playAudioResponse(audioUrl);
+							}
+						} catch (audioError) {
+							console.error("Error generating audio:", audioError);
+							// If audio generation fails, still show the message
+							this.addMessage(response.text, "agent", true);
+							this.handleError(
+								new Error("Audio generation failed, but message was received")
+							);
+						}
+
+						// Add agent response with fade in
+						this.addMessage(response.text, "agent", true);
 					}
 				} catch (error) {
-					console.error("Error generating audio:", error);
-					// If audio generation fails, still show the message and restart recording
-					setTimeout(() => {
-						if (!this.isRecording) {
-							this.startRecording();
+					console.error("Error in message processing:", error);
+
+					// Check if it's a token expiration error
+					if (error.message.includes("token") || error.message.includes("unauthorized")) {
+						// Try to reinitialize the messaging service
+						try {
+							await this.messagingService.initialize();
+							// Retry sending the message
+							const retryResponse =
+								await this.messagingService.sendMessage(finalTranscription);
+							if (retryResponse.text) {
+								this.addMessage(retryResponse.text, "agent", true);
+							}
+						} catch (retryError) {
+							this.handleError(retryError);
+							this.addMessage(
+								"Failed to process message. Please try again.",
+								"system",
+								true
+							);
 						}
-					}, 1000);
-				}
-
-				// One final cleanup before adding agent response
-				this.conversation = this.conversation.filter(
-					(msg) => msg.type !== "current-transcription"
-				);
-
-				// Add agent response with fade in
-				this.addMessage(botResponse.text, "agent", true);
-				this.isProcessingAgentResponse = false;
-			} else {
-				// If no valid transcription, just restart recording
-				console.log("No valid transcription, restarting recording...");
-				setTimeout(() => {
-					if (!this.isRecording) {
-						this.startRecording();
+					} else {
+						this.handleError(error);
+						this.addMessage(
+							"Failed to process message. Please try again.",
+							"system",
+							true
+						);
 					}
-				}, 1000);
+				} finally {
+					this.isProcessingAgentResponse = false;
+				}
 			}
 		} catch (error) {
 			this.handleError(error);
 			this.isProcessingAgentResponse = false;
-			// Only auto-restart if it's not a manual stop
+		} finally {
+			// Only auto-restart if it's not a manual stop and auto-stop is enabled
 			if (!this.isManualStop && this.autoStopEnabled) {
 				setTimeout(() => {
 					if (!this.isRecording) {
@@ -283,6 +323,7 @@ export default class AudioRecorder extends LightningElement {
 	}
 
 	updateCurrentTranscription(transcription) {
+		// Check if the transcription is valid
 		if (!transcription || transcription.trim() === "") return;
 
 		console.log("Updating current transcription:", transcription);

@@ -5,26 +5,27 @@ import sendMessage from "@salesforce/apex/AudioRecorderController.sendMessage";
 export class MessagingService {
 	async initialize() {
 		try {
-			const accessTokenResponse = await getAccessToken();
-			const newConversationResponse = await createConversation();
+			// We don't need to get access token separately anymore since it comes with createConversation
+			const conversationResponse = await createConversation();
 
-			if (accessTokenResponse.error) {
-				console.log("Error getting access token:", accessTokenResponse.error);
-				throw new Error(accessTokenResponse.error);
+			if (conversationResponse.error) {
+				console.log("Error creating conversation:", conversationResponse.error);
+				throw new Error(conversationResponse.error);
 			}
 
-			if (newConversationResponse.error) {
-				console.log("Error creating conversation:", newConversationResponse.error);
-				throw new Error(newConversationResponse.error);
-			}
+			console.log("Conversation created successfully:", conversationResponse);
 
-			console.log("Conversation created successfully:", newConversationResponse);
+			// Store all the necessary information from the response
+			this.conversationId = conversationResponse.conversationId;
+			this.lastMessageId = conversationResponse.messageId;
+			this.accessToken = conversationResponse.accessToken;
+			this.tokenType = conversationResponse.tokenType;
+			this.tokenExpiry = conversationResponse.tokenExpiry;
 
-			this.conversationId = newConversationResponse.conversationId;
-			this.lastMessageId = newConversationResponse.messageId;
-			this.accessToken = accessTokenResponse.accessToken;
-			this.tokenType = accessTokenResponse.tokenType;
-			this.tokenExpiry = accessTokenResponse.tokenExpiry;
+			console.log("Messaging service initialized with token:", {
+				conversationId: this.conversationId
+			});
+
 			return true;
 		} catch (error) {
 			console.error("Failed to initialize messaging service:", error);
@@ -38,56 +39,17 @@ export class MessagingService {
 			if (response.error) {
 				throw new Error(response.error);
 			}
+
+			// Store all the information from the response
 			this.conversationId = response.conversationId;
 			this.lastMessageId = response.messageId;
+			this.accessToken = response.accessToken;
+			this.tokenType = response.tokenType;
+			this.tokenExpiry = response.tokenExpiry;
+
 			return response;
 		} catch (error) {
 			console.error("Error creating conversation:", error);
-			throw error;
-		}
-	}
-
-	async getAccessToken() {
-		try {
-			const response = await fetch(this.authUrl, {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/x-www-form-urlencoded",
-					Accept: "application/json",
-					"X-Requested-With": "XMLHttpRequest",
-					Origin: window.location.origin
-				},
-				credentials: "include",
-				mode: "cors",
-				body: new URLSearchParams({
-					grant_type: "client_credentials",
-					client_id: this.orgId,
-					client_assertion_type: "urn:ietf:params:oauth:client-assertion-type:jwt-bearer",
-					scope: "api messaging_api"
-				})
-			});
-
-			if (!response.ok) {
-				const errorText = await response.text();
-				console.error("Token response error:", {
-					status: response.status,
-					statusText: response.statusText,
-					headers: Object.fromEntries(response.headers.entries()),
-					error: errorText
-				});
-				throw new Error(
-					`Failed to get access token: ${response.statusText}. Details: ${errorText}`
-				);
-			}
-
-			const data = await response.json();
-			this.accessToken = data.access_token;
-			this.tokenType = data.token_type;
-			this.tokenExpiry = Date.now() + data.expires_in * 1000;
-
-			return data;
-		} catch (error) {
-			console.error("Error getting access token:", error);
 			throw error;
 		}
 	}
@@ -96,6 +58,15 @@ export class MessagingService {
 		try {
 			if (!this.conversationId) {
 				throw new Error("Conversation not initialized");
+			}
+
+			if (!this.accessToken) {
+				throw new Error("Access token not available");
+			}
+
+			if (this.isTokenExpired()) {
+				console.log("Token expired, getting new token...");
+				await this.refreshToken();
 			}
 
 			console.log("Sending message:", {
@@ -107,7 +78,8 @@ export class MessagingService {
 			const response = await sendMessage({
 				conversationId: this.conversationId,
 				message: text,
-				replyToMessageId: this.lastMessageId
+				replyToMessageId: this.lastMessageId,
+				accessToken: this.accessToken
 			});
 
 			if (response.error) {
@@ -127,7 +99,29 @@ export class MessagingService {
 		}
 	}
 
+	async refreshToken() {
+		try {
+			const response = await getAccessToken();
+			if (response.error) {
+				throw new Error(response.error);
+			}
+
+			this.accessToken = response.accessToken;
+			this.tokenType = response.tokenType;
+			this.tokenExpiry = response.tokenExpiry;
+
+			console.log(
+				"Token refreshed successfully, new expiry:",
+				new Date(this.tokenExpiry).toISOString()
+			);
+		} catch (error) {
+			console.error("Error refreshing token:", error);
+			throw error;
+		}
+	}
+
 	isTokenExpired() {
-		return this.tokenExpiry && Date.now() > this.tokenExpiry;
+		// Add a 30-second buffer to prevent edge cases
+		return this.tokenExpiry && Date.now() + 30000 > this.tokenExpiry;
 	}
 }
