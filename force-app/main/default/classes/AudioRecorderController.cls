@@ -157,27 +157,22 @@ public with sharing class AudioRecorderController {
 	}
 
 	@AuraEnabled
-	public static Map<String, Object> createConversation() {
+	public static Map<String, Object> createConversation(String accessToken) {
 		try {
-			// First get the access token
-			AgentMessagingService.MessagingResponse tokenResponse = AgentMessagingService.getAccessToken();
-			if (tokenResponse.error != null) {
-				throw new AuraHandledException(tokenResponse.error);
+			if (String.isBlank(accessToken)) {
+				throw new AuraHandledException('Access token is required');
 			}
 
-			// Then create the conversation
-			AgentMessagingService.MessagingResponse response = AgentMessagingService.createConversation();
+			// Create the conversation with the provided access token
+			AgentMessagingService.MessagingResponse response = AgentMessagingService.createConversation(accessToken);
 			if (response.error != null) {
 				throw new AuraHandledException(response.error);
 			}
 
-			// Return both the conversation details and the access token
+			// Return only the conversation details
 			return new Map<String, Object>{
 				'conversationId' => response.conversationId,
-				'messageId' => response.messageId,
-				'accessToken' => tokenResponse.accessToken,
-				'tokenType' => tokenResponse.tokenType,
-				'tokenExpiry' => tokenResponse.tokenExpiry
+				'messageId' => response.messageId
 			};
 		} catch (Exception e) {
 			throw new AuraHandledException(e.getMessage());
@@ -189,6 +184,10 @@ public with sharing class AudioRecorderController {
 		try {
 			if (String.isBlank(conversationId)) {
 				throw new AuraHandledException('Conversation ID is required');
+			}
+			
+			if (String.isBlank(accessToken)) {
+				throw new AuraHandledException('Access token is required');
 			}
 			
 			AgentMessagingService.MessagingResponse response = AgentMessagingService.sendMessage(conversationId, message, replyToMessageId, accessToken);

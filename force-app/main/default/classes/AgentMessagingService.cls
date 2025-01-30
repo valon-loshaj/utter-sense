@@ -7,10 +7,10 @@ public with sharing class AgentMessagingService {
     private static final String CONVRESATION_URL = '/conversation';
     private static final String MESSAGE_URL = '/conversation/{{conversationId}}/message';
     private static final String BASE_URL = 'https://orgfarm-0f131521a0-dev-ed.develop.my.salesforce-scrt.com/iamessage/api/v2';
-    private static final String ISSUER = UserInfo.getOrganizationId(); // Your org ID
-    private static final String SUBJECT = UserInfo.getUserId(); // The user's ID
+    private static final String ISSUER = UserInfo.getOrganizationId();
+    private static final String SUBJECT = UserInfo.getUserId();
     private static final Integer TOKEN_EXPIRY = 300; // 5 minutes in seconds
-    private static final String CERTIFICATE_NAME = 'Utter_Sense_Certificate'; // Must match exactly with the certificate name in Setup
+    private static final String CERTIFICATE_NAME = 'Utter_Sense_Certificate';
     private static final String PLATFORM = 'Web';
     private static final String CAPABILITIES_VERSION = '1';
     
@@ -99,11 +99,11 @@ public with sharing class AgentMessagingService {
         try {
             System.debug('=== Starting getAccessToken method ===');
             
-            // Generate JWT token
+            // Generate JWT token using the generateJWT method
             String jwtToken = generateJWT();
             System.debug('JWT Token generated: ' + jwtToken);
 
-            // Formulate the endpoint
+            // Formulate the auth endpoint
             String endpoint = BASE_URL + AUTH_URL;
             System.debug('Endpoint URL: ' + endpoint);
 
@@ -131,7 +131,7 @@ public with sharing class AgentMessagingService {
             System.debug('Sending HTTP request...');
             HttpResponse res = http.send(req);
 
-            // Process the response
+            // Process the response: success should contain accessToken
             System.debug('Response Status Code: ' + res.getStatusCode());
             System.debug('Response Status: ' + res.getStatus());
             System.debug('Response Body: ' + res.getBody());
@@ -169,20 +169,20 @@ public with sharing class AgentMessagingService {
 
     /**
      * @description Initializes a new conversation with the messaging service
-     * @return MessagingResponse containing the conversation details
+     * @return MessagingResponse containing the conversation ID
      */
     @AuraEnabled
-    public static MessagingResponse createConversation() {
+    public static MessagingResponse createConversation(String accessToken) {
         try {
             System.debug('=== Starting createConversation method ===');
             
-            // First, get an access token
-            MessagingResponse tokenResponse = getAccessToken();
-            if (String.isBlank(tokenResponse.accessToken)) {
-                System.debug(LoggingLevel.ERROR, 'Failed to get access token before creating conversation');
-                return tokenResponse; // Return the error from token generation
+            if (String.isBlank(accessToken)) {
+                System.debug(LoggingLevel.ERROR, 'Access token is required');
+                MessagingResponse errorResponse = new MessagingResponse();
+                errorResponse.error = 'Access token is required';
+                return errorResponse;
             }
-            System.debug('Access token obtained successfully');
+            System.debug('Access token validation passed');
 
             // Generate a UUID for the conversation
             String conversationId = generateUUID();
@@ -207,12 +207,12 @@ public with sharing class AgentMessagingService {
             req.setEndpoint(endpoint);
             req.setMethod('POST');
             req.setHeader('Content-Type', 'application/json');
-            req.setHeader('Authorization', 'Bearer ' + tokenResponse.accessToken);
+            req.setHeader('Authorization', 'Bearer ' + accessToken);
             req.setBody(JSON.serialize(requestBody));
             
             System.debug('Request Headers: ' + req.getHeader('Content-Type'));
             System.debug('Request Method: ' + req.getMethod());
-            System.debug('Authorization Header Added: Bearer ' + tokenResponse.accessToken.substring(0, 10) + '...');
+            System.debug('Authorization Header Added: Bearer ' + accessToken.substring(0, 10) + '...');
             
             // Send the request
             Http http = new Http();
@@ -287,37 +287,26 @@ public with sharing class AgentMessagingService {
                 return response;
             }
             
-            // Create message structure
+            // Create request structure
             Map<String, Object> requestBody = new Map<String, Object>();
             
-            // Create the message object with required fields as per API docs
+            // Create the message object
             Map<String, Object> messageObj = new Map<String, Object>();
+            messageObj.put('inReplyToMessageId', String.isBlank(replyToMessageId) ? '' : replyToMessageId);
             messageObj.put('id', generateUUID());
             messageObj.put('messageType', 'StaticContentMessage');
             
-            if (String.isNotBlank(replyToMessageId)) {
-                messageObj.put('inReplyToMessageId', replyToMessageId);
-                System.debug('Added replyToMessageId to message object: ' + replyToMessageId);
-            }
-            else {
-                messageObj.put('inReplyToMessageId', '');
-            }
-            
-            // Create the staticContent object with required fields
+            // Create the staticContent object
             Map<String, Object> staticContent = new Map<String, Object>();
             staticContent.put('formatType', 'Text');
             staticContent.put('text', message);
             messageObj.put('staticContent', staticContent);
             
-            // Build the complete request structure with all required fields
+            // Build the complete request structure - order matters for some APIs
             requestBody.put('message', messageObj);
             requestBody.put('esDeveloperName', BOT_DEVELOPER_NAME);
-            if (String.isNotBlank(replyToMessageId)) {
-                requestBody.put('isNewMessagingSession', false);
-            }
-            else {
-                requestBody.put('isNewMessagingSession', true);
-            }
+            requestBody.put('isNewMessagingSession', true);
+            requestBody.put('routingAttributes', new Map<String, Object>());
             requestBody.put('language', 'en');
             
             System.debug('Request Body: ' + JSON.serializePretty(requestBody));
@@ -334,10 +323,6 @@ public with sharing class AgentMessagingService {
             req.setHeader('Authorization', 'Bearer ' + accessToken);
             req.setBody(JSON.serialize(requestBody));
             
-            // Add additional headers that might be required
-            req.setHeader('X-Salesforce-Client-Type', CLIENT_TYPE);
-            req.setHeader('X-Salesforce-Client-Version', CLIENT_VERSION);
-            
             System.debug('Request Headers: ' + req.getHeader('Content-Type'));
             System.debug('Request Method: ' + req.getMethod());
             System.debug('Authorization Header Added: Bearer ' + accessToken.substring(0, Math.min(accessToken.length(), 10)) + '...');
@@ -352,7 +337,7 @@ public with sharing class AgentMessagingService {
             System.debug('Response Status: ' + res.getStatus());
             System.debug('Response Body: ' + res.getBody());
             
-            if (res.getStatusCode() == 201 || res.getStatusCode() == 200) {
+            if (res.getStatusCode() == 201 || res.getStatusCode() == 200 || res.getStatusCode() == 202) {
                 System.debug('Request successful, processing response body...');
                 Map<String, Object> responseBody = (Map<String, Object>) JSON.deserializeUntyped(res.getBody());
                 response.messageId = (String) responseBody.get('messageId');
