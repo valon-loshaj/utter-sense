@@ -2,6 +2,7 @@ import { LightningElement, track, wire } from "lwc";
 import { AudioDeviceService } from "./audioDeviceService";
 import { WhisperService } from "./whisperService";
 import { MessagingService } from "./messagingService";
+import { ConversationStateService } from "./conversationStateService";
 import { ShowToastEvent } from "lightning/platformShowToastEvent";
 import { getRecord } from "lightning/uiRecordApi";
 import { SilenceDetectionService } from "./silenceDetectionService";
@@ -28,7 +29,7 @@ export default class AudioRecorder extends LightningElement {
 	whisperService;
 	messagingService;
 	silenceDetectionService;
-	messageId = 0;
+	conversationStateService;
 	audioElement;
 	einsteinLogoUrl = EINSTEIN_LOGO;
 
@@ -47,6 +48,17 @@ export default class AudioRecorder extends LightningElement {
 		this.whisperService = new WhisperService();
 		this.messagingService = new MessagingService();
 		this.silenceDetectionService = new SilenceDetectionService();
+		this.conversationStateService = new ConversationStateService();
+
+		// Bind conversation state changes to component
+		this.conversationStateService.addStateChangeHandler((conversation) => {
+			this.conversation = conversation;
+		});
+
+		// Bind message handler for server events
+		this.messagingService.addMessageHandler((messageData) => {
+			this.handleServerMessage(messageData);
+		});
 	}
 
 	async connectedCallback() {
@@ -80,14 +92,18 @@ export default class AudioRecorder extends LightningElement {
 
 			await this.audioDeviceService.initialize(this.selectedDeviceId);
 			await this.whisperService.initialize();
-
-			// Initialize messaging service and store conversation details
 			await this.messagingService.initialize();
 
-			// Add a system message to show the conversation started
-			this.addMessage("Conversation initialized successfully", "system", true);
-
+			// Initialize messaging service and store conversation details
 			this.micInitialized = true;
+
+			// Add system message through conversation state service
+			this.conversationStateService.addMessage(
+				"Conversation initialized successfully",
+				"system",
+				"System",
+				true
+			);
 
 			this.dispatchEvent(
 				new ShowToastEvent({
@@ -111,6 +127,8 @@ export default class AudioRecorder extends LightningElement {
 		this.whisperService.cleanup();
 		this.audioDeviceService.cleanup();
 		this.silenceDetectionService.cleanup();
+		this.messagingService.cleanup();
+		this.conversationStateService.clearConversation();
 		if (this.audioElement) {
 			this.audioElement.pause();
 			this.audioElement.src = "";
@@ -129,9 +147,7 @@ export default class AudioRecorder extends LightningElement {
 			this.autoStopEnabled = true;
 
 			// Clean up any existing transcription bubbles first
-			this.conversation = this.conversation.filter(
-				(msg) => msg.type !== "current-transcription"
-			);
+			this.conversationStateService.removeCurrentTranscription();
 
 			// Share the audio stream with the WhisperService
 			window.audioStream = this.audioDeviceService.stream;
@@ -144,7 +160,7 @@ export default class AudioRecorder extends LightningElement {
 			this.silenceDetectionService.start();
 
 			// Reset current transcription
-			this.currentTranscription = "";
+			this.conversationStateService.removeCurrentTranscription();
 
 			// Set recording state and loading state
 			this.isRecording = true;
@@ -155,7 +171,7 @@ export default class AudioRecorder extends LightningElement {
 				// Real-time transcription update callback
 				(transcription) => {
 					console.log("Received real-time transcription:", transcription);
-					this.updateCurrentTranscription(transcription);
+					this.conversationStateService.updateCurrentTranscription(transcription);
 				},
 				// Error callback
 				(error) => {
@@ -185,109 +201,41 @@ export default class AudioRecorder extends LightningElement {
 			this.whisperService.stop();
 			this.isRecording = false;
 
-			// Remove any existing real-time transcription bubble immediately
-			const currentTranscriptionMessage = this.conversation.find(
-				(msg) => msg.type === "current-transcription"
-			);
-
-			if (currentTranscriptionMessage) {
-				currentTranscriptionMessage.fadeOut = true;
-				// Force a re-render to show the fade out
-				this.conversation = [...this.conversation];
-
-				// Wait for fade out animation
-				await new Promise((resolve) => setTimeout(resolve, 300));
-			}
-
-			// Clean up the conversation by removing any transcription messages
-			this.conversation = this.conversation.filter(
-				(msg) => msg.type !== "current-transcription"
-			);
+			// Remove current transcription with fade out
+			this.conversationStateService.removeCurrentTranscription();
 
 			// Get final transcription
 			const finalTranscription = await this.whisperService.getFinalTranscription();
 
 			// Only proceed if we have a valid transcription
 			if (finalTranscription && finalTranscription.trim()) {
-				// Create a new conversation array without transcription messages and add the final message
-				const cleanedConversation = this.conversation.filter(
-					(msg) => msg.type !== "current-transcription"
+				// Add user message through conversation state service
+				this.conversationStateService.addMessage(
+					finalTranscription,
+					"user",
+					this.currentUser.data?.fields?.FirstName?.value || "You",
+					true
 				);
-
-				this.conversation = cleanedConversation;
-
-				// Add user's final message to conversation with fade in
-				this.addMessage(finalTranscription, "user", true);
 
 				// Start processing agent response
 				this.isProcessingAgentResponse = true;
 
 				try {
-					// Send message to bot and get response
 					console.log("Sending message to agent:", finalTranscription);
 					const response = await this.messagingService.sendMessage(finalTranscription);
-
-					if (response.text) {
-						console.log("Received response from agent:", response);
-						// Generate audio from the bot's response
-						try {
-							console.log("Generating audio for response:", response.text);
-							const audioResponse = await this.whisperService.generateAudio(
-								response.text
-							);
-							console.log("Audio response received:", audioResponse);
-
-							if (audioResponse && audioResponse.audioBase64) {
-								const audioBlob = this.base64ToBlob(
-									audioResponse.audioBase64,
-									"audio/mp3"
-								);
-								const audioUrl = URL.createObjectURL(audioBlob);
-								console.log("Created audio URL:", audioUrl);
-								await this.playAudioResponse(audioUrl);
-							}
-						} catch (audioError) {
-							console.error("Error generating audio:", audioError);
-							// If audio generation fails, still show the message
-							this.addMessage(response.text, "agent", true);
-							this.handleError(
-								new Error("Audio generation failed, but message was received")
-							);
-						}
-
-						// Add agent response with fade in
-						this.addMessage(response.text, "agent", true);
-					}
+					console.log(
+						"Message sent successfully, waiting for response through events:",
+						response
+					);
 				} catch (error) {
 					console.error("Error in message processing:", error);
-
-					// Check if it's a token expiration error
-					if (error.message.includes("token") || error.message.includes("unauthorized")) {
-						// Try to reinitialize the messaging service
-						try {
-							await this.messagingService.initialize();
-							// Retry sending the message
-							const retryResponse =
-								await this.messagingService.sendMessage(finalTranscription);
-							if (retryResponse.text) {
-								this.addMessage(retryResponse.text, "agent", true);
-							}
-						} catch (retryError) {
-							this.handleError(retryError);
-							this.addMessage(
-								"Failed to process message. Please try again.",
-								"system",
-								true
-							);
-						}
-					} else {
-						this.handleError(error);
-						this.addMessage(
-							"Failed to process message. Please try again.",
-							"system",
-							true
-						);
-					}
+					this.handleError(error);
+					this.conversationStateService.addMessage(
+						"Failed to process message. Please try again.",
+						"system",
+						"System",
+						true
+					);
 				} finally {
 					this.isProcessingAgentResponse = false;
 				}
@@ -322,79 +270,33 @@ export default class AudioRecorder extends LightningElement {
 		}
 	}
 
-	updateCurrentTranscription(transcription) {
-		// Check if the transcription is valid
-		if (!transcription || transcription.trim() === "") return;
+	// Handle incoming server messages
+	async handleServerMessage(messageData) {
+		try {
+			// Add message to conversation through state service
+			const message = this.conversationStateService.handleServerMessage(messageData);
 
-		console.log("Updating current transcription:", transcription);
+			// Handle audio generation if it's an agent message
+			if (messageData.type === "agent" && messageData.text) {
+				try {
+					console.log("Generating audio for response:", messageData.text);
+					const audioResponse = await this.whisperService.generateAudio(messageData.text);
 
-		// Update the current transcription in the conversation
-		const currentTranscriptionIndex = this.conversation.findIndex(
-			(msg) => msg.type === "current-transcription"
-		);
-
-		const transcriptionMessage = {
-			id:
-				currentTranscriptionIndex >= 0
-					? this.conversation[currentTranscriptionIndex].id
-					: this.messageId++,
-			text: transcription.trim(),
-			type: "current-transcription",
-			timestamp: new Date().toISOString(),
-			isLoading: false,
-			userName: `${this.currentUser.data?.fields?.FirstName?.value || "You"} (typing...)`,
-			isAgentMessage: false
-		};
-
-		if (currentTranscriptionIndex >= 0) {
-			// Update existing transcription
-			this.conversation = [
-				...this.conversation.slice(0, currentTranscriptionIndex),
-				transcriptionMessage,
-				...this.conversation.slice(currentTranscriptionIndex + 1)
-			];
-		} else {
-			// Add new transcription message
-			this.conversation = [...this.conversation, transcriptionMessage];
-		}
-
-		// Scroll to the latest message
-		this.scrollToLatestMessage();
-
-		console.log("Updated conversation:", this.conversation);
-	}
-
-	addMessage(text, type, shouldFadeIn = false) {
-		const userName =
-			type === "user"
-				? `${this.currentUser.data?.fields?.FirstName?.value || "You"}`
-				: type === "system"
-					? "System"
-					: "Agent";
-
-		this.conversation = [
-			...this.conversation,
-			{
-				id: this.messageId++,
-				text: text.trim(),
-				type: type || "none",
-				timestamp: new Date().toISOString(),
-				isLoading: false,
-				userName: userName,
-				isAgentMessage: type === "agent",
-				fadeIn: shouldFadeIn
+					if (audioResponse && audioResponse.audioBase64) {
+						const audioBlob = this.base64ToBlob(audioResponse.audioBase64, "audio/mp3");
+						const audioUrl = URL.createObjectURL(audioBlob);
+						await this.playAudioResponse(audioUrl);
+					}
+				} catch (audioError) {
+					console.error("Error generating audio:", audioError);
+					this.handleError(
+						new Error("Audio generation failed, but message was received")
+					);
+				}
 			}
-		];
-		this.isTranscribing = false;
-
-		// Scroll to the latest message
-		this.scrollToLatestMessage();
-	}
-
-	// Add a method to handle conversation updates
-	renderedCallback() {
-		if (this.conversation.length > 0) {
-			this.scrollToLatestMessage();
+		} catch (error) {
+			console.error("Error handling server message:", error);
+			this.handleError(error);
 		}
 	}
 
@@ -415,6 +317,8 @@ export default class AudioRecorder extends LightningElement {
 		this.whisperService.cleanup();
 		this.audioDeviceService.cleanup();
 		this.silenceDetectionService.cleanup();
+		this.messagingService.cleanup();
+		this.conversationStateService.clearConversation();
 		if (this.audioElement) {
 			this.audioElement.pause();
 			this.audioElement.src = "";
@@ -560,9 +464,14 @@ export default class AudioRecorder extends LightningElement {
 		}
 
 		// Clean up any ongoing transcription messages
-		this.conversation = this.conversation.filter((msg) => msg.type !== "current-transcription");
+		this.conversationStateService.removeCurrentTranscription();
 
 		// Add a message indicating the conversation was stopped
-		this.addMessage("Conversation stopped by user", "system", true);
+		this.conversationStateService.addMessage(
+			"Conversation stopped by user",
+			"system",
+			"System",
+			true
+		);
 	}
 }
