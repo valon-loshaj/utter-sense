@@ -41,5 +41,8 @@
 		"editor.defaultFormatter": "esbenp.prettier-vscode"
 	},
 	"prettier.documentSelectors": ["**/*.html", "**/*.js", "**/*.json"],
-	"prettier.requireConfig": true
+	"prettier.requireConfig": true,
+	"[xml]": {
+		"editor.defaultFormatter": "redhat.vscode-xml"
+	}
 }

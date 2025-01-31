@@ -155,4 +155,68 @@ public with sharing class AudioRecorderController {
 			);
 		}
 	}
+
+	@AuraEnabled
+	public static Map<String, Object> createConversation(String accessToken) {
+		try {
+			if (String.isBlank(accessToken)) {
+				throw new AuraHandledException('Access token is required');
+			}
+
+			// Create the conversation with the provided access token
+			AgentMessagingService.MessagingResponse response = AgentMessagingService.createConversation(accessToken);
+			if (response.error != null) {
+				throw new AuraHandledException(response.error);
+			}
+
+			// Return only the conversation details
+			return new Map<String, Object>{
+				'conversationId' => response.conversationId,
+				'messageId' => response.messageId
+			};
+		} catch (Exception e) {
+			throw new AuraHandledException(e.getMessage());
+		}
+	}
+
+	@AuraEnabled
+	public static Map<String, Object> sendMessage(String conversationId, String message, String replyToMessageId, String accessToken) {
+		try {
+			if (String.isBlank(conversationId)) {
+				throw new AuraHandledException('Conversation ID is required');
+			}
+			
+			if (String.isBlank(accessToken)) {
+				throw new AuraHandledException('Access token is required');
+			}
+			
+			AgentMessagingService.MessagingResponse response = AgentMessagingService.sendMessage(conversationId, message, replyToMessageId, accessToken);
+			if (response.error != null) {
+				throw new AuraHandledException(response.error);
+			}
+			return new Map<String, Object>{
+				'messageId' => response.messageId,
+				'text' => response.text
+			};
+		} catch (Exception e) {
+			throw new AuraHandledException(e.getMessage());
+		}
+	}
+
+	@AuraEnabled
+	public static Map<String, Object> getAccessToken() {
+		try {
+			AgentMessagingService.MessagingResponse response = AgentMessagingService.getAccessToken();
+			if (response.error != null) {
+				throw new AuraHandledException(response.error);
+			}
+			return new Map<String, Object>{
+				'accessToken' => response.accessToken,
+				'tokenType' => response.tokenType,
+				'tokenExpiry' => response.tokenExpiry
+			};
+		} catch (Exception e) {
+			throw new AuraHandledException(e.getMessage());
+		}
+	}
 }
