@@ -1,98 +1,89 @@
 <template>
-	<div class="audio-recorder">
-		<div class="device-selection">
-			<label for="audioDevices">Select Microphone:</label>
-			<select
-				id="audioDevices"
-				class="audio-device-select"
-				onchange={handleDeviceChange}
-				disabled={isRecording}
-			>
-				<option value="">Select a microphone...</option>
-				<template for:each={audioDevices} for:item="device">
-					<option key={device.deviceId} value={device.deviceId}>
-						{device.label}
-					</option>
-				</template>
-			</select>
-		</div>
+    <div class="audio-recorder">
+        <div class="device-selection">
+            <label for="audioDevices">Select Microphone:</label>
+            <select id="audioDevices" class="audio-device-select" onchange={handleDeviceChange} disabled={isRecording}>
+                <option value="">Select a microphone...</option>
+                <template for:each={audioDevices} for:item="device">
+                    <option key={device.deviceId} value={device.deviceId}>{device.label}</option>
+                </template>
+            </select>
+        </div>
 
-		<div class="controls">
-			<button
-				class="record-button"
-				onclick={initializeRecording}
-				disabled={micInitialized}
-			>
-				Initialize Microphone
-			</button>
+        <div class="controls">
+            <button class="record-button" onclick={initializeRecording} disabled={micInitialized}>
+                Initialize Microphone
+            </button>
 
-			<button
-				class="record-button"
-				onclick={startRecording}
-				disabled={notRecording}
-			>
-				{recordButtonLabel}
-			</button>
+            <button class="record-button" onclick={startRecording} disabled={notRecording}>{recordButtonLabel}</button>
 
-			<button
-				class="stop-button"
-				onclick={handleStopClick}
-				disabled={stopButtonDisabled}
-			>
-				Stop Conversation
-			</button>
-		</div>
+            <button class="stop-button" onclick={handleStopClick} disabled={stopButtonDisabled}>
+                Stop Conversation
+            </button>
+        </div>
 
-		<div class="conversation-container">
-			<template if:false={conversation.length}>
-				<div class="empty-conversation">
-					<img
-						src={einsteinLogoUrl}
-						alt="Einstein Logo"
-						class="einstein-logo-large"
-					/>
-				</div>
-			</template>
-			<template if:true={conversation.length}>
-				<div class="conversation">
-					<template for:each={conversation} for:item="message">
-						<div
-							key={message.id}
-							class="message"
-							data-type={message.type}
-							data-fade-in={message.fadeIn}
-							data-fade-out={message.fadeOut}
-						>
-							<div class="user-name">{message.userName}</div>
-							<div class="message-bubble">
-								{message.text}
-								<template if:true={message.isAgentMessage}>
-									<div class="audio-controls">
-										<div class={audioIndicatorClass}>
-											<span></span>
-											<span></span>
-											<span></span>
-										</div>
-									</div>
-								</template>
-							</div>
-							<div class="message-timestamp">{message.timestamp}</div>
-						</div>
-					</template>
-				</div>
-			</template>
+        <div class="conversation-container">
+            <template if:false={conversation.length}>
+                <div class="empty-conversation">
+                    <img src={einsteinLogoUrl} alt="Einstein Logo" class="einstein-logo-large" />
+                </div>
+            </template>
+            <template if:true={conversation.length}>
+                <div class="conversation" data-conversation-length={conversation.length}>
+                    <template for:each={conversation} for:item="message">
+                        <div
+                            key={message.id}
+                            class={getMessageClass}
+                            data-id={message.id}
+                            data-type={message.type}
+                            data-is-agent={message.isAgentMessage}>
+                            <div class="message-header">
+                                <span class="user-name">{message.userName}</span>
+                                <span class="message-timestamp">{message.timestamp}</span>
+                            </div>
+                            <div class={getMessageBubbleClass}>
+                                <div class="message-content">{message.text}</div>
+                                <template if:true={message.isAgentMessage}>
+                                    <div class="audio-controls">
+                                        <div class={audioIndicatorClass}>
+                                            <span></span>
+                                            <span></span>
+                                            <span></span>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </template>
 
-			<div if:true={isProcessingAgentResponse} class="loading-indicator">
-				<div class="loading-bubble"></div>
-				<div class="loading-bubble"></div>
-				<div class="loading-bubble"></div>
-			</div>
-		</div>
+            <template if:true={isAnotherParticipantTyping}>
+                <div class="typing-indicator">
+                    <template for:each={typingParticipants} for:item="participant">
+                        <div key={participant.name} class="typing-bubble">
+                            <span>{participant.name} is typing...</span>
+                            <div class="typing-animation">
+                                <span></span>
+                                <span></span>
+                                <span></span>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </template>
 
-		<div class={silenceIndicatorClass} if:true={isRecording}>
-			<div class="countdown-circle"></div>
-			<div class="countdown-progress" style={silenceProgressStyle}></div>
-			<span>{silenceCountdown}</span>
-		</div>
-	</div>
+            <div if:true={isProcessingAgentResponse} class="loading-indicator">
+                <div class="loading-bubble"></div>
+                <div class="loading-bubble"></div>
+                <div class="loading-bubble"></div>
+            </div>
+        </div>
+
+        <div class={silenceIndicatorClass} if:true={isRecording}>
+            <div class="countdown-circle"></div>
+            <div class="countdown-progress" style={silenceProgressStyle}></div>
+            <span>{silenceCountdown}</span>
+        </div>
+    </div>
 </template>
