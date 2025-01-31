@@ -8,7 +8,7 @@ export const CONVERSATION_CONSTANTS = {
     ParticipantRoles: {
         ENDUSER: 'EndUser',
         AGENT: 'Agent',
-        CHATBOT: 'ChatBot',
+        CHATBOT: 'Chatbot',
         SYSTEM: 'System'
     },
     RoutingTypes: {

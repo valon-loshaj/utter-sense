@@ -169,12 +169,17 @@ export class ConversationStateService {
             return null;
         }
 
-        const message = this.addMessage(
-            messageText,
-            isEndUser ? 'user' : isAgentOrBot ? 'agent' : 'system',
-            entry.actorName,
-            true
-        );
+        // Determine the message type based on the actor type
+        let messageType;
+        if (isEndUser) {
+            messageType = 'user';
+        } else if (isAgentOrBot) {
+            messageType = 'agent';
+        } else {
+            messageType = 'system';
+        }
+
+        const message = this.addMessage(messageText, messageType, entry.actorName, true);
 
         message.messageId = entry.messageId;
         message.isAgentMessage = isAgentOrBot;
