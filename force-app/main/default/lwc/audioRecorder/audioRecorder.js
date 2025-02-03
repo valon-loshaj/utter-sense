@@ -193,28 +193,38 @@ export default class AudioRecorder extends LightningElement {
         }
 
         try {
-            // Stop silence detection
+            // 1. Stop silence detection
             this.silenceDetectionService.stop();
 
-            // Stop recording first
+            // 2. Stop recording and mark state
             this.whisperService.stop();
             this.isRecording = false;
 
-            // Remove current transcription with fade out
-            this.conversationStateService.removeCurrentTranscription();
+            // 3. Remove current transcription with fade out
+            await new Promise((resolve) => {
+                this.conversationStateService.removeCurrentTranscription();
+                // Wait for fade out animation
+                setTimeout(resolve, 300);
+            });
 
-            // Get final transcription
+            // 4. Get final transcription
             const finalTranscription = await this.whisperService.getFinalTranscription();
 
             // Only proceed if we have a valid transcription
             if (finalTranscription && finalTranscription.trim()) {
-                // Start processing agent response
+                // 5. Start processing state
                 this.isProcessingAgentResponse = true;
 
                 try {
+                    // 6. Send message to messaging service
                     console.log('Sending message to agent:', finalTranscription);
-                    const response = await this.messagingService.sendMessage(finalTranscription);
-                    console.log('Message sent successfully, waiting for response through events:', response);
+                    await this.messagingService.sendMessage(finalTranscription);
+                    console.log('Message sent successfully, waiting for response through events');
+
+                    // 7. Wait for agent response and audio playback
+                    // Note: The actual message handling is done in handleIncomingMessage
+                    // We don't auto-restart recording here anymore as it will be handled
+                    // after audio playback completes
                 } catch (error) {
                     console.error('Error in message processing:', error);
                     this.handleError(error);
@@ -224,36 +234,42 @@ export default class AudioRecorder extends LightningElement {
                         'System',
                         true
                     );
+                    // If there's an error, we can restart recording
+                    this.handleConversationContinuation();
                 } finally {
                     this.isProcessingAgentResponse = false;
                 }
+            } else {
+                // If no valid transcription, we can restart recording
+                this.handleConversationContinuation();
             }
         } catch (error) {
             this.handleError(error);
             this.isProcessingAgentResponse = false;
-        } finally {
-            // Only auto-restart if it's not a manual stop and auto-stop is enabled
-            if (!this.isManualStop && this.autoStopEnabled) {
-                setTimeout(() => {
-                    if (!this.isRecording) {
-                        this.startRecording();
-                    }
-                }, 1000);
-            }
+            this.handleConversationContinuation();
         }
     }
 
-    // Add method to scroll to latest message
+    // New method to handle conversation continuation
+    handleConversationContinuation() {
+        if (!this.isManualStop && this.autoStopEnabled && !this.isPlayingAudio) {
+            setTimeout(() => {
+                if (!this.isRecording) {
+                    this.startRecording();
+                }
+            }, 1000);
+        }
+    }
+
+    // Update scrollToLatestMessage to work with reversed layout
     scrollToLatestMessage() {
         // Get the conversation container
         const container = this.template.querySelector('.conversation-container');
         if (container) {
-            // Use requestAnimationFrame for smooth scrolling
-            requestAnimationFrame(() => {
-                container.scrollTo({
-                    top: container.scrollHeight,
-                    behavior: 'smooth'
-                });
+            // In a reversed layout, new messages are at the top, so scroll to 0
+            container.scrollTo({
+                top: 0,
+                behavior: 'smooth'
             });
         }
     }
@@ -356,7 +372,16 @@ export default class AudioRecorder extends LightningElement {
         console.log('[AudioRecorder] Processing incoming message:', JSON.stringify(messageData, null, 2));
 
         try {
-            // Structure the message data in the format expected by the conversation state service
+            // Check if this is a user message (final transcription)
+            const isUserMessage = messageData.data?.conversationEntry?.sender?.role === 'EndUser';
+
+            // If it's a user message, remove any existing preview messages
+            if (isUserMessage) {
+                this.conversationMessages = this.conversationMessages.filter((msg) => msg.type !== 'preview');
+                this.currentTranscription = null;
+            }
+
+            // Structure the message data
             const serverMessage = {
                 data: JSON.stringify({
                     conversationId: messageData.data.conversationId,
@@ -374,9 +399,6 @@ export default class AudioRecorder extends LightningElement {
             // Add message to conversation through state service
             const message = this.conversationStateService.handleServerMessage(serverMessage);
 
-            console.log('[AudioRecorder] Created message:', JSON.stringify(message, null, 2));
-
-            // If no message was created, return early
             if (!message) {
                 console.warn('[AudioRecorder] No message created from server message');
                 return;
@@ -385,17 +407,26 @@ export default class AudioRecorder extends LightningElement {
             // Handle audio generation if it's an agent message
             if (message.isAgentMessage && message.text) {
                 try {
+                    // Ensure we're not recording during audio playback
+                    if (this.isRecording) {
+                        this.whisperService.stop();
+                        this.isRecording = false;
+                    }
+
                     console.log('[AudioRecorder] Generating audio for response:', message.text);
                     const audioResponse = await this.whisperService.generateAudio(message.text);
 
                     if (audioResponse && audioResponse.audioBase64) {
                         const audioBlob = this.base64ToBlob(audioResponse.audioBase64, 'audio/mp3');
                         const audioUrl = URL.createObjectURL(audioBlob);
+                        // Wait for audio playback to complete before continuing
                         await this.playAudioResponse(audioUrl);
                     }
                 } catch (audioError) {
                     console.error('[AudioRecorder] Error generating audio:', audioError);
                     this.handleError(new Error('Audio generation failed, but message was received'));
+                    // Even if audio fails, try to continue the conversation
+                    this.handleConversationContinuation();
                 }
             }
 
@@ -404,6 +435,7 @@ export default class AudioRecorder extends LightningElement {
         } catch (error) {
             console.error('[AudioRecorder] Error handling incoming message:', error);
             this.handleError(error);
+            this.handleConversationContinuation();
         }
     }
 
@@ -512,7 +544,7 @@ export default class AudioRecorder extends LightningElement {
         return !this.isRecording;
     }
 
-    // Add new method to handle audio playback
+    // Update the audio playback method to handle the sequential flow
     async playAudioResponse(audioUrl) {
         try {
             console.log('Starting audio playback with URL:', audioUrl);
@@ -522,33 +554,31 @@ export default class AudioRecorder extends LightningElement {
             // Remove any existing event listeners
             this.audioElement.removeEventListener('ended', this.handleAudioEnded);
 
-            // Add event listeners for debugging and auto-restart
-            this.audioElement.addEventListener('canplay', () => console.log('Audio can play'));
-            this.audioElement.addEventListener('error', (e) => console.error('Audio error:', e));
+            // Return a promise that resolves when audio playback is complete
+            await new Promise((resolve, reject) => {
+                this.audioElement.addEventListener('canplay', () => console.log('Audio can play'));
+                this.audioElement.addEventListener('error', (e) => {
+                    console.error('Audio error:', e);
+                    reject(e);
+                });
 
-            // Add event listener for audio completion
-            this.audioElement.addEventListener('ended', () => {
-                console.log('Audio playback completed');
-                this.isPlayingAudio = false;
-                // Only auto-restart if auto-stop is enabled
-                if (this.autoStopEnabled) {
-                    console.log('Auto-restart enabled, starting new recording...');
-                    setTimeout(() => {
-                        if (!this.isRecording) {
-                            this.startRecording();
-                        }
-                    }, 1000);
-                } else {
-                    console.log('Auto-restart disabled, ending conversation');
-                }
+                this.audioElement.addEventListener('ended', () => {
+                    console.log('Audio playback completed');
+                    this.isPlayingAudio = false;
+                    resolve();
+                });
+
+                this.audioElement.play().catch(reject);
             });
 
-            await this.audioElement.play();
-            console.log('Audio playback started successfully');
+            // After audio completes, handle continuation
+            this.handleConversationContinuation();
         } catch (error) {
             console.error('Audio playback error:', error);
             this.handleError(new Error(`Audio playback error: ${error.message}`));
             this.isPlayingAudio = false;
+            // Even if audio fails, try to continue the conversation
+            this.handleConversationContinuation();
         }
     }
 
@@ -558,15 +588,60 @@ export default class AudioRecorder extends LightningElement {
 
     handleMessageClass(message) {
         this.currentMessage = message;
-        return this.messageClasses;
+        return this.getMessageClass;
     }
 
-    get messageClasses() {
-        if (!this.currentMessage) return 'message';
+    get getMessageBubbleClass() {
+        const message = this.currentMessage;
+        if (!message) return 'message-bubble';
+
+        const classes = ['message-bubble'];
+
+        // Add appropriate bubble class based on message type
+        switch (message.type) {
+            case 'user':
+                classes.push('outgoing');
+                break;
+            case 'agent':
+                classes.push('incoming');
+                break;
+            case 'system':
+                classes.push('system');
+                break;
+            case 'preview':
+                classes.push('preview');
+                break;
+        }
+
+        return classes.join(' ');
+    }
+
+    get getMessageClass() {
+        const message = this.currentMessage;
+        if (!message) return 'message';
 
         const classes = ['message'];
-        if (this.currentMessage.fadeIn) classes.push('fade-in');
-        if (this.currentMessage.fadeOut) classes.push('fade-out');
+
+        // Add message type class
+        switch (message.type) {
+            case 'user':
+                classes.push('outgoing');
+                break;
+            case 'agent':
+                classes.push('incoming');
+                break;
+            case 'system':
+                classes.push('system');
+                break;
+            case 'preview':
+                classes.push('preview outgoing');
+                break;
+        }
+
+        // Add animation classes
+        if (message.fadeIn) classes.push('fade-in');
+        if (message.fadeOut) classes.push('fade-out');
+
         return classes.join(' ');
     }
 
@@ -642,34 +717,10 @@ export default class AudioRecorder extends LightningElement {
         this.conversationStateService.addMessage('Conversation stopped by user', 'system', 'System', true);
     }
 
-    get getMessageClass() {
-        const message = this.currentMessage;
-        if (!message) return 'message';
-
-        const classes = ['message'];
-        if (message.type === 'user') classes.push('outgoing');
-        if (message.type === 'agent') classes.push('incoming');
-        if (message.type === 'system') classes.push('system');
-        if (message.fadeIn) classes.push('fade-in');
-        if (message.fadeOut) classes.push('fade-out');
-        return classes.join(' ');
-    }
-
-    get getMessageBubbleClass() {
-        const message = this.currentMessage;
-        if (!message) return 'message-bubble';
-
-        const classes = ['message-bubble'];
-        if (message.type === 'user') classes.push('outgoing');
-        if (message.type === 'agent') classes.push('incoming');
-        if (message.type === 'system') classes.push('system');
-        return classes.join(' ');
-    }
-
-    // Use only a getter for conversation that returns the tracked property
+    // Update the conversation getter to maintain correct order
     get conversation() {
-        console.log('[AudioRecorder] Accessing conversation:', this.conversationMessages);
-        return this.conversationMessages;
+        // Filter out preview messages and maintain correct order
+        return this.conversationMessages.filter((message) => message.type !== 'preview').reverse(); // Reverse the array to show newest messages at the top
     }
 
     handleRoutingEvent(routingData) {
@@ -689,6 +740,30 @@ export default class AudioRecorder extends LightningElement {
 
         if (message) {
             this.conversationStateService.addMessage(message, 'system', 'System', true);
+        }
+    }
+
+    // Update current transcription
+    updateCurrentTranscription(text) {
+        if (!this.currentTranscription) {
+            // Add preview message for real-time transcription
+            this.currentTranscription = {
+                id: window.crypto.randomUUID(),
+                text: text.trim(),
+                type: 'preview',
+                timestamp: new Date().toISOString(),
+                isLoading: false,
+                userName: 'You',
+                fadeIn: true,
+                fadeOut: false
+            };
+            // Add to conversation state
+            this.conversationMessages = [...this.conversationMessages, this.currentTranscription];
+        } else {
+            // Update existing preview message text
+            this.currentTranscription.text = text.trim();
+            // Force a reactive update
+            this.conversationMessages = [...this.conversationMessages];
         }
     }
 }

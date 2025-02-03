@@ -29,11 +29,11 @@
                 </div>
             </template>
             <template if:true={conversation.length}>
-                <div class="conversation" data-conversation-length={conversation.length}>
+                <div class="conversation">
                     <template for:each={conversation} for:item="message">
                         <div
                             key={message.id}
-                            class={getMessageClass}
+                            class={handleMessageClass}
                             data-id={message.id}
                             data-type={message.type}
                             data-is-agent={message.isAgentMessage}>
