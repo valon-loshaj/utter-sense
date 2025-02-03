@@ -1,9 +1,9 @@
 // Constants for conversation entry types
 export const CONVERSATION_CONSTANTS = {
     EntryTypes: {
-        CONVERSATION_MESSAGE: 'CONVERSATION_MESSAGE',
-        PARTICIPANT_CHANGED: 'PARTICIPANT_CHANGED',
-        ROUTING_RESULT: 'ROUTING_RESULT'
+        CONVERSATION_MESSAGE: 'Message',
+        PARTICIPANT_CHANGED: 'ParticipantChanged',
+        ROUTING_RESULT: 'RoutingResult'
     },
     ParticipantRoles: {
         ENDUSER: 'EndUser',
@@ -22,16 +22,33 @@ export const CONVERSATION_CONSTANTS = {
         UNKNOWN_ERROR: 'UnknownError'
     },
     EventTypes: {
-        CONVERSATION_MESSAGE: 'CONVERSATION_MESSAGE',
-        CONVERSATION_ROUTING_RESULT: 'CONVERSATION_ROUTING_RESULT',
-        CONVERSATION_PARTICIPANT_CHANGED: 'CONVERSATION_PARTICIPANT_CHANGED',
-        CONVERSATION_TYPING_STARTED_INDICATOR: 'CONVERSATION_TYPING_STARTED_INDICATOR',
-        CONVERSATION_TYPING_STOPPED_INDICATOR: 'CONVERSATION_TYPING_STOPPED_INDICATOR',
+        CONVERSATION_MESSAGE: 'Message',
+        CONVERSATION_ROUTING_RESULT: 'RoutingResult',
+        CONVERSATION_PARTICIPANT_CHANGED: 'ParticipantChanged',
+        CONVERSATION_TYPING_STARTED_INDICATOR: 'TypingStartedIndicator',
+        CONVERSATION_TYPING_STOPPED_INDICATOR: 'TypingStoppedIndicator',
         CONVERSATION_DELIVERY_ACKNOWLEDGEMENT: 'CONVERSATION_DELIVERY_ACKNOWLEDGEMENT',
         CONVERSATION_READ_ACKNOWLEDGEMENT: 'CONVERSATION_READ_ACKNOWLEDGEMENT',
         CONVERSATION_CLOSE_CONVERSATION: 'CONVERSATION_CLOSE_CONVERSATION'
     }
 };
+
+/**
+ * Safely converts a proxy object to a plain object
+ * @param {object} obj - Object to convert
+ * @returns {object} Plain object
+ */
+function toPlainObject(obj) {
+    try {
+        if (obj === null || typeof obj !== 'object') {
+            return obj;
+        }
+        return JSON.parse(JSON.stringify(obj));
+    } catch (error) {
+        console.error('[ConversationEntryUtil] Error converting proxy to plain object:', error);
+        return obj;
+    }
+}
 
 /**
  * Parses JSON data from a server-sent event.
@@ -40,14 +57,31 @@ export const CONVERSATION_CONSTANTS = {
  * @throws {Error} if event data is invalid.
  */
 export function parseServerSentEventData(event) {
-    if (event && event.data && typeof event.data === 'string') {
-        const data = JSON.parse(event.data);
-        if (!data || typeof data !== 'object') {
-            throw new Error('Error parsing data in server sent event.');
+    try {
+        console.log('[ConversationEntryUtil] Parsing server event data:', JSON.stringify(event, null, 2));
+
+        // Convert proxy to plain object first
+        const plainEvent = toPlainObject(event);
+
+        // If the event.data is already a string, parse it
+        if (typeof plainEvent.data === 'string') {
+            const data = JSON.parse(plainEvent.data);
+            if (!data || typeof data !== 'object') {
+                throw new Error('Error parsing data in server sent event.');
+            }
+            return data;
         }
-        return data;
+
+        // If event.data is an object and needs to be parsed
+        if (plainEvent.data && typeof plainEvent.data === 'object') {
+            return plainEvent.data;
+        }
+
+        throw new Error('Invalid data format in server sent event.');
+    } catch (error) {
+        console.error('[ConversationEntryUtil] Error parsing server event data:', error);
+        throw error;
     }
-    throw new Error('Invalid data in server sent event.');
 }
 
 /**
@@ -58,35 +92,46 @@ export function parseServerSentEventData(event) {
 export function createConversationEntry(data) {
     try {
         if (typeof data === 'object') {
-            console.log('[ConversationEntryUtil] Creating entry from data:', data);
-            const entryPayload = JSON.parse(data.conversationEntry.entryPayload);
-            console.log('[ConversationEntryUtil] Parsed entry payload:', entryPayload);
+            // Convert proxy to plain object first
+            const plainData = toPlainObject(data);
+            console.log('[ConversationEntryUtil] Creating entry from data:', JSON.stringify(plainData, null, 2));
 
-            // Validate entry type
-            if (!Object.values(CONVERSATION_CONSTANTS.EntryTypes).includes(entryPayload.entryType)) {
-                console.warn(`Unexpected and/or unsupported entryType: ${entryPayload.entryType}`);
+            const entry = plainData.conversationEntry;
+            if (!entry) {
+                console.warn('[ConversationEntryUtil] No conversation entry found in data');
                 return null;
             }
 
-            const entry = {
-                conversationId: data.conversationId,
-                messageId: data.conversationEntry.identifier,
+            const entryPayload =
+                typeof entry.entryPayload === 'string' ? JSON.parse(entry.entryPayload) : entry.entryPayload;
+
+            console.log('[ConversationEntryUtil] Parsed entry payload:', JSON.stringify(entryPayload, null, 2));
+
+            // More flexible validation for entry type
+            const validEntryTypes = Object.values(CONVERSATION_CONSTANTS.EntryTypes);
+            const currentEntryType = entry.entryType || entryPayload.entryType;
+
+            if (!validEntryTypes.includes(currentEntryType)) {
+                console.warn(`[ConversationEntryUtil] Unexpected and/or unsupported entryType: ${currentEntryType}`);
+                return null;
+            }
+
+            const result = {
+                conversationId: plainData.conversationId,
+                messageId: entry.identifier,
                 content: entryPayload.abstractMessage || entryPayload,
                 messageType: entryPayload.abstractMessage
                     ? entryPayload.abstractMessage.messageType
                     : entryPayload.routingType || entryPayload.entries?.[0]?.operation,
-                entryType: entryPayload.entryType,
-                sender: data.conversationEntry.sender,
-                actorName: data.conversationEntry.senderDisplayName
-                    ? data.conversationEntry.senderDisplayName || data.conversationEntry.sender.role
-                    : entryPayload.entries?.[0]?.displayName || entryPayload.entries?.[0]?.participant.role,
-                actorType: data.conversationEntry.sender.role,
-                transcriptedTimestamp: data.conversationEntry.transcriptedTimestamp,
-                messageReason: entryPayload.messageReason
+                entryType: currentEntryType,
+                sender: entry.sender,
+                actorName: entry.senderDisplayName || entry.sender.role,
+                actorType: entry.sender.role,
+                transcriptedTimestamp: entry.transcriptedTimestamp
             };
 
-            console.log('[ConversationEntryUtil] Created conversation entry:', entry);
-            return entry;
+            console.log('[ConversationEntryUtil] Created conversation entry:', JSON.stringify(result, null, 2));
+            return result;
         }
         return null;
     } catch (err) {
@@ -128,15 +173,38 @@ export function isParticipantChangeEvent(entry) {
  * @returns {string} - Message text content.
  */
 export function getTextMessageContent(entry) {
-    console.log('[ConversationEntryUtil] Getting text content from entry:', entry);
+    try {
+        console.log('[ConversationEntryUtil] Getting text content from entry:', JSON.stringify(entry, null, 2));
 
-    // Handle static content messages
-    if (entry.content?.abstractMessage?.staticContent?.text) {
-        return entry.content.abstractMessage.staticContent.text;
+        // Convert proxy to plain object first
+        const plainEntry = toPlainObject(entry);
+
+        // Handle static content messages
+        if (plainEntry.content?.abstractMessage?.staticContent?.text) {
+            return plainEntry.content.abstractMessage.staticContent.text;
+        }
+
+        // Handle static content directly in content
+        if (plainEntry.content?.staticContent?.text) {
+            return plainEntry.content.staticContent.text;
+        }
+
+        // Handle regular text messages
+        if (plainEntry.content?.text) {
+            return plainEntry.content.text;
+        }
+
+        // Handle abstract message text
+        if (plainEntry.content?.abstractMessage?.text) {
+            return plainEntry.content.abstractMessage.text;
+        }
+
+        console.warn('[ConversationEntryUtil] No text content found in entry:', JSON.stringify(plainEntry, null, 2));
+        return '';
+    } catch (error) {
+        console.error('[ConversationEntryUtil] Error getting text content:', error);
+        return '';
     }
-
-    // Handle regular text messages
-    return entry.content?.text || entry.content?.abstractMessage?.text || '';
 }
 
 /**

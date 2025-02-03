@@ -276,12 +276,45 @@ export default class AudioRecorder extends LightningElement {
                 }
             }
 
-            // Handle nested message data
-            const eventType = messageData.data?.type;
-            const eventData = messageData.data?.data;
+            // Handle routing events directly
+            if (messageData.type === 'routing' && messageData.data?.conversationEntry) {
+                const entry = messageData.data.conversationEntry;
+                const entryPayload = JSON.parse(entry.entryPayload);
 
-            if (!eventData || !eventData.conversationEntry) {
+                if (entryPayload.entryType === 'RoutingResult') {
+                    this.handleRoutingEvent({
+                        routingType: entryPayload.routingType,
+                        failureType: entryPayload.failureType,
+                        failureReason: entryPayload.failureReason,
+                        actor: {
+                            actorName: entry.senderDisplayName,
+                            role: entry.sender.role,
+                            appType: entry.sender.appType
+                        },
+                        timestamp: new Date().toISOString()
+                    });
+                    return;
+                }
+            }
+
+            // Handle both nested and flat message structures
+            let eventType, eventData;
+
+            if (messageData.data?.type && messageData.data?.data) {
+                // Nested structure
+                eventType = messageData.data.type;
+                eventData = messageData.data.data;
+            } else if (messageData.conversationEntry) {
+                // Flat structure
+                eventType = 'message'; // Default to message type for flat structure
+                eventData = messageData;
+            } else {
                 console.warn('[AudioRecorder] Invalid message data structure:', JSON.stringify(messageData, null, 2));
+                return;
+            }
+
+            if (!eventData.conversationEntry) {
+                console.warn('[AudioRecorder] Missing conversation entry in data:', JSON.stringify(eventData, null, 2));
                 return;
             }
 
@@ -292,43 +325,21 @@ export default class AudioRecorder extends LightningElement {
             const entryPayload = JSON.parse(entry.entryPayload);
             console.log('[AudioRecorder] Parsed entry payload:', JSON.stringify(entryPayload, null, 2));
 
-            switch (eventType) {
-                case 'routing':
-                    if (entryPayload.entryType === 'RoutingResult') {
-                        this.handleRoutingEvent({
-                            routingType: entryPayload.routingType,
-                            failureType: entryPayload.failureType,
-                            failureReason: entryPayload.failureReason,
-                            actor: {
-                                actorName: entry.senderDisplayName,
-                                role: entry.sender.role,
-                                appType: entry.sender.appType
-                            },
-                            timestamp: messageData.data.timestamp
-                        });
+            // Handle message events
+            if (eventType === 'message' && entryPayload.entryType === 'Message') {
+                const processedData = {
+                    type: eventType,
+                    data: eventData,
+                    timestamp: messageData.data?.timestamp || new Date().toISOString(),
+                    content: entryPayload.abstractMessage?.staticContent?.text,
+                    sender: entry.sender,
+                    actor: {
+                        actorName: entry.senderDisplayName,
+                        role: entry.sender.role,
+                        appType: entry.sender.appType
                     }
-                    break;
-
-                case 'message':
-                    if (entryPayload.entryType === 'Message') {
-                        const processedData = {
-                            type: eventType,
-                            data: eventData,
-                            timestamp: messageData.data.timestamp,
-                            content: entryPayload.abstractMessage?.staticContent?.text,
-                            sender: entry.sender,
-                            actor: {
-                                actorName: entry.senderDisplayName,
-                                role: entry.sender.role,
-                                appType: entry.sender.appType
-                            }
-                        };
-                        await this.handleIncomingMessage(processedData);
-                    }
-                    break;
-
-                default:
-                    console.log('[AudioRecorder] Unhandled message type:', eventType);
+                };
+                await this.handleIncomingMessage(processedData);
             }
         } catch (error) {
             console.error('[AudioRecorder] Error processing server message. Error details:', {
@@ -342,17 +353,28 @@ export default class AudioRecorder extends LightningElement {
     }
 
     async handleIncomingMessage(messageData) {
-        console.log('[AudioRecorder] Processing incoming message:', messageData);
+        console.log('[AudioRecorder] Processing incoming message:', JSON.stringify(messageData, null, 2));
 
         try {
-            // Add message to conversation through state service
-            const message = this.conversationStateService.handleServerMessage({
-                data: messageData.data,
-                type: messageData.type,
-                timestamp: messageData.timestamp
-            });
+            // Structure the message data in the format expected by the conversation state service
+            const serverMessage = {
+                data: JSON.stringify({
+                    conversationId: messageData.data.conversationId,
+                    conversationEntry: {
+                        identifier: messageData.data.conversationEntry.identifier,
+                        entryType: 'Message',
+                        entryPayload: messageData.data.conversationEntry.entryPayload,
+                        sender: messageData.data.conversationEntry.sender,
+                        senderDisplayName: messageData.data.conversationEntry.senderDisplayName,
+                        transcriptedTimestamp: messageData.data.conversationEntry.transcriptedTimestamp
+                    }
+                })
+            };
 
-            console.log('[AudioRecorder] Created message:', message);
+            // Add message to conversation through state service
+            const message = this.conversationStateService.handleServerMessage(serverMessage);
+
+            console.log('[AudioRecorder] Created message:', JSON.stringify(message, null, 2));
 
             // If no message was created, return early
             if (!message) {
