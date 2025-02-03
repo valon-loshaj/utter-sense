@@ -65,6 +65,9 @@ export class MessagingService {
                     case 'participant':
                         this.handleParticipantChange(data.data);
                         break;
+                    case 'routing':
+                        this.handleRoutingEvent(data.data);
+                        break;
                     case 'close':
                         this.handleConversationClose();
                         break;
@@ -270,5 +273,32 @@ export class MessagingService {
             console.error('[MessagingService] Failed to recover from connection failure:', error);
             this.cleanup();
         }
+    }
+
+    // Add new method to handle routing events
+    handleRoutingEvent(data) {
+        console.log('[MessagingService] Processing routing event:', data);
+
+        // Notify handlers of the routing event
+        this.messageHandlers.forEach((handler) => {
+            try {
+                const entry = data.conversationEntry;
+                const payload = JSON.parse(entry.entryPayload);
+
+                handler({
+                    type: 'routing',
+                    data: data,
+                    timestamp: data.timestamp,
+                    routingDetails: {
+                        routingType: payload.routingType,
+                        failureType: payload.failureType,
+                        failureReason: payload.failureReason,
+                        sender: entry.sender
+                    }
+                });
+            } catch (error) {
+                console.error('[MessagingService] Error in routing handler:', error);
+            }
+        });
     }
 }

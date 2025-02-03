@@ -150,37 +150,47 @@ export class ConversationStateService {
     }
 
     handleConversationMessage(entry) {
-        console.log('[ConversationStateService] Handling conversation message:', entry);
+        try {
+            console.log('[ConversationStateService] Handling conversation message:', JSON.stringify(entry, null, 2));
 
-        const isEndUser = ConversationEntryUtil.isMessageFromEndUser(entry);
-        const isAgentOrBot = ConversationEntryUtil.isMessageFromAgentOrBot(entry);
-        const messageText = ConversationEntryUtil.getTextMessageContent(entry);
+            const isEndUser = ConversationEntryUtil.isMessageFromEndUser(entry);
+            const isAgentOrBot = ConversationEntryUtil.isMessageFromAgentOrBot(entry);
+            const messageText = ConversationEntryUtil.getTextMessageContent(entry);
 
-        console.log('[ConversationStateService] Message details:', {
-            isEndUser,
-            isAgentOrBot,
-            messageText,
-            actorType: entry.actorType,
-            actorName: entry.actorName
-        });
+            console.log('[ConversationStateService] Message details:', {
+                isEndUser,
+                isAgentOrBot,
+                messageText,
+                actorType: entry.actorType,
+                actorName: entry.actorName
+            });
 
-        if (!messageText) {
-            console.warn('[ConversationStateService] No message text found');
+            if (!messageText) {
+                console.warn('[ConversationStateService] No message text found');
+                return null;
+            }
+
+            // Determine the message type based on the actor type
+            let messageType;
+            if (isEndUser) {
+                messageType = 'user';
+            } else if (isAgentOrBot) {
+                messageType = 'agent';
+            } else {
+                messageType = 'system';
+            }
+
+            const message = this.addMessage(messageText, messageType, entry.actorName, true);
+
+            message.messageId = entry.messageId;
+            message.isAgentMessage = isAgentOrBot;
+
+            console.log('[ConversationStateService] Created message:', JSON.stringify(message, null, 2));
+            return message;
+        } catch (error) {
+            console.error('[ConversationStateService] Error handling conversation message:', error);
             return null;
         }
-
-        const message = this.addMessage(
-            messageText,
-            isEndUser ? 'user' : isAgentOrBot ? 'agent' : 'system',
-            entry.actorName,
-            true
-        );
-
-        message.messageId = entry.messageId;
-        message.isAgentMessage = isAgentOrBot;
-
-        console.log('[ConversationStateService] Created message:', message);
-        return message;
     }
 
     handleParticipantChanged(entry) {
@@ -203,22 +213,29 @@ export class ConversationStateService {
     }
 
     handleRoutingResult(entry) {
+        console.log('[ConversationStateService] Handling routing result:', entry);
         let messageText = '';
 
-        if (entry.messageType === CONVERSATION_CONSTANTS.RoutingTypes.INITIAL) {
-            if (entry.content.failureType !== CONVERSATION_CONSTANTS.RoutingFailureTypes.NO_ERROR) {
-                messageText = `Initial routing failed: ${entry.content.reasonForNotRouting}`;
+        // Extract routing information from the entry payload
+        const routingType = entry.content.routingType;
+        const failureType = entry.content.failureType;
+        const failureReason = entry.content.failureReason;
+
+        if (routingType === 'Initial') {
+            if (failureType === 'None') {
+                messageText = 'Connecting to service...';
             } else {
-                messageText = 'Conversation started successfully';
+                messageText = `Connection failed: ${failureReason || 'Unknown error'}`;
             }
-        } else if (entry.messageType === CONVERSATION_CONSTANTS.RoutingTypes.TRANSFER) {
-            if (entry.content.failureType === CONVERSATION_CONSTANTS.RoutingFailureTypes.NO_ERROR) {
+        } else if (routingType === 'Transfer') {
+            if (failureType === 'None') {
                 messageText = 'Transferring conversation...';
             } else {
-                messageText = `Transfer failed: ${entry.content.reasonForNotRouting}`;
+                messageText = `Transfer failed: ${failureReason || 'Unknown error'}`;
             }
         }
 
+        console.log('[ConversationStateService] Creating routing message:', messageText);
         return messageText ? this.addMessage(messageText, 'system', 'System', true) : null;
     }
 

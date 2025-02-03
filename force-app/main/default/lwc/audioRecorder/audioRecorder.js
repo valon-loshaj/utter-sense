@@ -260,77 +260,159 @@ export default class AudioRecorder extends LightningElement {
 
     // Handle incoming server messages
     async handleServerMessage(messageData) {
-        console.log('[AudioRecorder] Handling server message:', messageData);
+        console.log('[AudioRecorder] Handling server message:', JSON.stringify(messageData, null, 2));
+
         try {
-            switch (messageData.type) {
-                case 'message':
-                    // Handle regular message
-                    await this.handleIncomingMessage(messageData);
-                    break;
-                case 'typing_started':
-                    // Handle typing started
-                    this.handleTypingIndicator(messageData);
-                    break;
-                case 'typing_stopped':
-                    // Handle typing stopped
-                    this.handleTypingIndicator(messageData);
-                    break;
-                case 'participant':
-                    // Handle participant changes
-                    this.handleParticipantChange(messageData);
-                    break;
-                case 'close':
-                    // Handle conversation close
-                    this.handleConversationClose(messageData);
-                    break;
-                default:
-                    console.log('[AudioRecorder] Unhandled message type:', messageData.type);
+            // Handle direct message data (for participant and typing events)
+            if (messageData.type && messageData.actor) {
+                switch (messageData.type) {
+                    case 'participant':
+                        this.handleParticipantChange(messageData);
+                        return;
+                    case 'typing_started':
+                    case 'typing_stopped':
+                        this.handleTypingIndicator(messageData);
+                        return;
+                }
+            }
+
+            // Handle routing events directly
+            if (messageData.type === 'routing' && messageData.data?.conversationEntry) {
+                const entry = messageData.data.conversationEntry;
+                const entryPayload = JSON.parse(entry.entryPayload);
+
+                if (entryPayload.entryType === 'RoutingResult') {
+                    this.handleRoutingEvent({
+                        routingType: entryPayload.routingType,
+                        failureType: entryPayload.failureType,
+                        failureReason: entryPayload.failureReason,
+                        actor: {
+                            actorName: entry.senderDisplayName,
+                            role: entry.sender.role,
+                            appType: entry.sender.appType
+                        },
+                        timestamp: new Date().toISOString()
+                    });
+                    return;
+                }
+            }
+
+            // Handle both nested and flat message structures
+            let eventType, eventData;
+
+            if (messageData.data?.type && messageData.data?.data) {
+                // Nested structure
+                eventType = messageData.data.type;
+                eventData = messageData.data.data;
+            } else if (messageData.conversationEntry) {
+                // Flat structure
+                eventType = 'message'; // Default to message type for flat structure
+                eventData = messageData;
+            } else {
+                console.warn('[AudioRecorder] Invalid message data structure:', JSON.stringify(messageData, null, 2));
+                return;
+            }
+
+            if (!eventData.conversationEntry) {
+                console.warn('[AudioRecorder] Missing conversation entry in data:', JSON.stringify(eventData, null, 2));
+                return;
+            }
+
+            console.log('[AudioRecorder] Processing event type:', eventType);
+            console.log('[AudioRecorder] Event data:', JSON.stringify(eventData, null, 2));
+
+            const entry = eventData.conversationEntry;
+            const entryPayload = JSON.parse(entry.entryPayload);
+            console.log('[AudioRecorder] Parsed entry payload:', JSON.stringify(entryPayload, null, 2));
+
+            // Handle message events
+            if (eventType === 'message' && entryPayload.entryType === 'Message') {
+                const processedData = {
+                    type: eventType,
+                    data: eventData,
+                    timestamp: messageData.data?.timestamp || new Date().toISOString(),
+                    content: entryPayload.abstractMessage?.staticContent?.text,
+                    sender: entry.sender,
+                    actor: {
+                        actorName: entry.senderDisplayName,
+                        role: entry.sender.role,
+                        appType: entry.sender.appType
+                    }
+                };
+                await this.handleIncomingMessage(processedData);
             }
         } catch (error) {
-            console.error('[AudioRecorder] Error in handleServerMessage:', error);
+            console.error('[AudioRecorder] Error processing server message. Error details:', {
+                name: error.name,
+                message: error.message,
+                stack: error.stack,
+                data: JSON.stringify(messageData, null, 2)
+            });
             this.handleError(error);
         }
     }
 
     async handleIncomingMessage(messageData) {
-        console.log('[AudioRecorder] Processing incoming message:', messageData);
+        console.log('[AudioRecorder] Processing incoming message:', JSON.stringify(messageData, null, 2));
 
-        // Add message to conversation through state service
-        const message = this.conversationStateService.handleServerMessage(messageData);
-        console.log('[AudioRecorder] Created message:', message);
+        try {
+            // Structure the message data in the format expected by the conversation state service
+            const serverMessage = {
+                data: JSON.stringify({
+                    conversationId: messageData.data.conversationId,
+                    conversationEntry: {
+                        identifier: messageData.data.conversationEntry.identifier,
+                        entryType: 'Message',
+                        entryPayload: messageData.data.conversationEntry.entryPayload,
+                        sender: messageData.data.conversationEntry.sender,
+                        senderDisplayName: messageData.data.conversationEntry.senderDisplayName,
+                        transcriptedTimestamp: messageData.data.conversationEntry.transcriptedTimestamp
+                    }
+                })
+            };
 
-        // If no message was created, return early
-        if (!message) {
-            console.warn('[AudioRecorder] No message created from server message');
-            return;
-        }
+            // Add message to conversation through state service
+            const message = this.conversationStateService.handleServerMessage(serverMessage);
 
-        // Handle audio generation if it's an agent message
-        if (message.isAgentMessage && message.text) {
-            try {
-                console.log('[AudioRecorder] Generating audio for response:', message.text);
-                const audioResponse = await this.whisperService.generateAudio(message.text);
+            console.log('[AudioRecorder] Created message:', JSON.stringify(message, null, 2));
 
-                if (audioResponse && audioResponse.audioBase64) {
-                    const audioBlob = this.base64ToBlob(audioResponse.audioBase64, 'audio/mp3');
-                    const audioUrl = URL.createObjectURL(audioBlob);
-                    await this.playAudioResponse(audioUrl);
-                }
-            } catch (audioError) {
-                console.error('[AudioRecorder] Error generating audio:', audioError);
-                this.handleError(new Error('Audio generation failed, but message was received'));
+            // If no message was created, return early
+            if (!message) {
+                console.warn('[AudioRecorder] No message created from server message');
+                return;
             }
-        }
 
-        // Scroll to the latest message
-        this.scrollToLatestMessage();
+            // Handle audio generation if it's an agent message
+            if (message.isAgentMessage && message.text) {
+                try {
+                    console.log('[AudioRecorder] Generating audio for response:', message.text);
+                    const audioResponse = await this.whisperService.generateAudio(message.text);
+
+                    if (audioResponse && audioResponse.audioBase64) {
+                        const audioBlob = this.base64ToBlob(audioResponse.audioBase64, 'audio/mp3');
+                        const audioUrl = URL.createObjectURL(audioBlob);
+                        await this.playAudioResponse(audioUrl);
+                    }
+                } catch (audioError) {
+                    console.error('[AudioRecorder] Error generating audio:', audioError);
+                    this.handleError(new Error('Audio generation failed, but message was received'));
+                }
+            }
+
+            // Scroll to the latest message
+            this.scrollToLatestMessage();
+        } catch (error) {
+            console.error('[AudioRecorder] Error handling incoming message:', error);
+            this.handleError(error);
+        }
     }
 
     handleTypingIndicator(messageData) {
-        const { actor, type } = messageData;
+        console.log('[AudioRecorder] Handling typing indicator:', JSON.stringify(messageData, null, 2));
 
+        const { actor, type } = messageData;
         if (!actor || !actor.actorName) {
-            console.warn('Missing actor information in typing indicator event');
+            console.warn('[AudioRecorder] Missing actor information in typing indicator event');
             return;
         }
 
@@ -342,7 +424,7 @@ export default class AudioRecorder extends LightningElement {
                     {
                         name: actor.actorName,
                         role: actor.role,
-                        timestamp: messageData.timestamp
+                        timestamp: new Date().toISOString()
                     }
                 ];
             }
@@ -353,13 +435,15 @@ export default class AudioRecorder extends LightningElement {
 
         // Update the typing indicator visibility
         this.isAnotherParticipantTyping = this.typingParticipants.length > 0;
+        console.log('[AudioRecorder] Updated typing participants:', this.typingParticipants);
     }
 
     handleParticipantChange(messageData) {
+        console.log('[AudioRecorder] Handling participant change:', JSON.stringify(messageData, null, 2));
         const { actor, operation } = messageData;
 
         if (!actor || !actor.actorName) {
-            console.warn('Missing actor information in participant event');
+            console.warn('[AudioRecorder] Missing actor information in participant event');
             return;
         }
 
@@ -586,5 +670,25 @@ export default class AudioRecorder extends LightningElement {
     get conversation() {
         console.log('[AudioRecorder] Accessing conversation:', this.conversationMessages);
         return this.conversationMessages;
+    }
+
+    handleRoutingEvent(routingData) {
+        console.log('[AudioRecorder] Handling routing event:', routingData);
+
+        // Add appropriate system message based on routing result
+        let message = '';
+        if (routingData.routingType === 'Initial') {
+            if (routingData.failureType === 'None') {
+                message = 'Connecting to service...';
+            } else {
+                message = `Connection failed: ${routingData.failureReason || 'Unknown error'}`;
+            }
+        } else if (routingData.routingType === 'Transfer') {
+            message = 'Transferring conversation...';
+        }
+
+        if (message) {
+            this.conversationStateService.addMessage(message, 'system', 'System', true);
+        }
     }
 }
