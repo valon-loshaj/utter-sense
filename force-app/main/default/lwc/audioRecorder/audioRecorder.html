@@ -31,17 +31,12 @@
             <template if:true={conversation.length}>
                 <div class="conversation">
                     <template for:each={conversation} for:item="message">
-                        <div
-                            key={message.id}
-                            class={handleMessageClass}
-                            data-id={message.id}
-                            data-type={message.type}
-                            data-is-agent={message.isAgentMessage}>
+                        <div key={message.id} class="message" data-id={message.id} data-type={message.type}>
                             <div class="message-header">
                                 <span class="user-name">{message.userName}</span>
                                 <span class="message-timestamp">{message.timestamp}</span>
                             </div>
-                            <div class={getMessageBubbleClass}>
+                            <div class="message-bubble" data-type={message.type}>
                                 <div class="message-content">{message.text}</div>
                                 <template if:true={message.isAgentMessage}>
                                     <div class="audio-controls">
