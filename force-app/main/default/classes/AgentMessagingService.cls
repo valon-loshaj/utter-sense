@@ -6,7 +6,7 @@ public with sharing class AgentMessagingService {
     private static final String AUTH_URL = '/authorization/unauthenticated/access-token';
     private static final String CONVRESATION_URL = '/conversation';
     private static final String MESSAGE_URL = '/conversation/{{conversationId}}/message';
-    private static final String BASE_URL = 'https://orgfarm-0f131521a0-dev-ed.develop.my.salesforce-scrt.com/iamessage/api/v2';
+    private static final String BASE_URL = 'https://orgfarm-e0ea23d84f-dev-ed.develop.my.salesforce-scrt.com/iamessage/api/v2';
     private static final String ISSUER = UserInfo.getOrganizationId();
     private static final String SUBJECT = UserInfo.getUserId();
     private static final Integer TOKEN_EXPIRY = 300; // 5 minutes in seconds

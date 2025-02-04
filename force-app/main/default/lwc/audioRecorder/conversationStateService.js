@@ -10,6 +10,9 @@ export class ConversationStateService {
         this.currentTranscription = null;
         this.typingParticipants = new Map();
         this.isAnotherParticipantTyping = false;
+        this._stateUpdateTimeout = null;
+        this._messageQueue = [];
+        this._isProcessingQueue = false;
     }
 
     // Add state change handler registration methods
@@ -26,19 +29,23 @@ export class ConversationStateService {
 
     // Notify handlers of state changes
     notifyStateChange() {
-        console.log('[ConversationStateService] Notifying state change');
-        console.log('[ConversationStateService] Current conversation state:', this.conversation);
-        console.log('[ConversationStateService] Number of handlers:', this.stateChangeHandlers.size);
+        if (this._stateUpdateTimeout) {
+            clearTimeout(this._stateUpdateTimeout);
+        }
 
-        const conversationCopy = [...this.conversation];
-        this.stateChangeHandlers.forEach((handler) => {
-            try {
-                console.log('[ConversationStateService] Executing state change handler');
-                handler(conversationCopy);
-            } catch (error) {
-                console.error('[ConversationStateService] Error in state change handler:', error);
-            }
-        });
+        this._stateUpdateTimeout = setTimeout(() => {
+            requestAnimationFrame(() => {
+                console.log('[ConversationStateService] Notifying state change');
+                const conversationCopy = [...this.conversation];
+                this.stateChangeHandlers.forEach((handler) => {
+                    try {
+                        handler(conversationCopy);
+                    } catch (error) {
+                        console.error('[ConversationStateService] Error in state change handler:', error);
+                    }
+                });
+            });
+        }, 16); // One frame at 60fps
     }
 
     // Add a message to the conversation
@@ -62,41 +69,68 @@ export class ConversationStateService {
             fadeOut: false
         };
 
-        console.log('[ConversationStateService] Created message object:', message);
+        this._messageQueue.push(message);
+        this._processMessageQueue();
 
-        // Create a new array to ensure reactivity
-        this.conversation = [...this.conversation, message];
-        console.log('[ConversationStateService] Updated conversation array:', this.conversation);
-
-        this.notifyStateChange();
         return message;
+    }
+
+    // Process message queue to batch updates
+    async _processMessageQueue() {
+        if (this._isProcessingQueue) return;
+        this._isProcessingQueue = true;
+
+        while (this._messageQueue.length > 0) {
+            const messages = this._messageQueue.splice(0, Math.min(5, this._messageQueue.length));
+
+            await new Promise((resolve) => {
+                requestAnimationFrame(() => {
+                    this.conversation = [...this.conversation, ...messages];
+                    this.notifyStateChange();
+                    resolve();
+                });
+            });
+
+            // Small delay between batches if there are more messages
+            if (this._messageQueue.length > 0) {
+                await new Promise((resolve) => setTimeout(resolve, 32));
+            }
+        }
+
+        this._isProcessingQueue = false;
     }
 
     // Update current transcription
     updateCurrentTranscription(text) {
-        if (!this.currentTranscription) {
-            this.currentTranscription = this.addMessage(text, 'transcription', 'You', true);
-        } else {
-            this.currentTranscription.text = text;
-            this.notifyStateChange();
-        }
+        requestAnimationFrame(() => {
+            if (!this.currentTranscription) {
+                this.currentTranscription = this.addMessage(text, 'transcription', 'You', true);
+            } else {
+                this.currentTranscription.text = text;
+                this.notifyStateChange();
+            }
+        });
     }
 
     // Remove current transcription
     removeCurrentTranscription() {
-        console.log('[ConversationStateService] Removing current transcription');
-        if (this.currentTranscription) {
+        if (!this.currentTranscription) return;
+
+        requestAnimationFrame(() => {
             const index = this.conversation.findIndex((msg) => msg.id === this.currentTranscription.id);
             if (index !== -1) {
                 this.conversation[index].fadeOut = true;
                 this.notifyStateChange();
+
                 setTimeout(() => {
-                    this.conversation = this.conversation.filter((msg) => msg.id !== this.currentTranscription.id);
-                    this.notifyStateChange();
+                    requestAnimationFrame(() => {
+                        this.conversation = this.conversation.filter((msg) => msg.id !== this.currentTranscription.id);
+                        this.notifyStateChange();
+                    });
                 }, 300);
             }
             this.currentTranscription = null;
-        }
+        });
     }
 
     // Clear conversation

@@ -3,7 +3,7 @@ export class SilenceDetectionService {
         this.audioContext = null;
         this.analyser = null;
         this.mediaStreamSource = null;
-        this.silenceThreshold = -50; // dB threshold for silence
+        this.silenceThreshold = -65; // Lowered from -50 to -65 dB to require more silence
         this.silenceTimer = null;
         this.silenceDuration = 0;
         this.silenceCallback = null;
@@ -11,10 +11,10 @@ export class SilenceDetectionService {
         this.isActive = false;
         this.onSilenceProgress = null;
         this.CONFIG = {
-            maxSilentTime: 2.5,
-            debounceTime: 150, // ms to wait before considering sound as breaking silence
-            minSilenceTime: 0.1, // minimum time to consider as silence
-            smoothingFactor: 0.2 // factor for smoothing silence duration updates
+            maxSilentTime: 3.0, // Increased from 2.5s to 3.0s for more natural pauses
+            debounceTime: 300, // Increased from 150ms to 300ms to prevent quick fluctuations
+            minSilenceTime: 0.5, // Increased from 0.1s to 0.5s to require longer silence
+            smoothingFactor: 0.15 // Decreased from 0.2 to 0.15 for smoother transitions
         };
         this.lastSoundTime = null;
         this.smoothedDuration = 0;
