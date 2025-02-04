@@ -13,8 +13,8 @@ export class EventSourceService {
         this.maxReconnectAttempts = 3;
         this.reconnectInterval = 5000; // 5 seconds
         this.heartbeatTimeout = 90000; // 90 seconds
-        this.baseUrl = 'https://orgfarm-0f131521a0-dev-ed.develop.my.salesforce-scrt.com';
-        this.orgId = '00DdL00000JGsXn'; // Add orgId as a property
+        this.baseUrl = 'https://orgfarm-e0ea23d84f-dev-ed.develop.my.salesforce-scrt.com';
+        this.orgId = '00DKB000000L0ba'; // Add orgId as a property
         this.isPolyfillLoaded = false;
     }
 

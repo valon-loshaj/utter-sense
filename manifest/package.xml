@@ -4,5 +4,38 @@
 		<members>eventSourcePolyfill</members>
 		<name>StaticResource</name>
 	</types>
+	<types>
+		<members>openai_whisper</members>
+		<members>Utter_Sense_SCRT_Domain</members>
+		<name>RemoteSiteSetting</name>
+	</types>
+	<types>
+		<members>Utter_Sense_FAQ_Agent_Router</members>
+		<name>Flow</name>
+	</types>
+	<types>
+		<members>*</members>
+		<name>ConversationMessageDefinition</name>
+	</types>
+	<types>
+		<members>Utter_Sense_ES</members>
+		<name>EmbeddedServiceConfig</name>
+	</types>
+	<types>
+		<members>Utter_Sense_FAQ_Agent</members>
+		<name>bot</name>
+	</types>
+	<types>
+		<members>*</members>
+		<name>genaifunction</name>
+	</types>
+	<types>
+		<members>Utter_Sense_FAQ</members>
+		<name>genaiprompttemplate</name>
+	</types>
+	<types>
+		<members>Utter_Sense_FAQ_Agent</members>
+		<name>genaiplanner</name>
+	</types>
 	<version>62.0</version>
 </Package>

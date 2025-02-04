@@ -27,6 +27,18 @@ export default class AudioRecorder extends LightningElement {
     @track isAnotherParticipantTyping = false;
     @track typingParticipants = [];
 
+    // Add new properties for state management
+    @track uiState = {
+        isInitializing: false,
+        isTransitioning: false
+    };
+
+    // Debounce timer for UI updates
+    _uiUpdateTimer = null;
+
+    // Add state batching timeout
+    _stateUpdateTimeout = null;
+
     audioDeviceService;
     whisperService;
     messagingService;
@@ -52,16 +64,29 @@ export default class AudioRecorder extends LightningElement {
         this.silenceDetectionService = new SilenceDetectionService();
         this.conversationStateService = new ConversationStateService();
 
-        // Bind conversation state changes to component
+        // Optimize conversation state updates
         this.conversationStateService.addStateChangeHandler((conversation) => {
-            console.log('[AudioRecorder] Conversation state changed:', conversation);
-            this.conversationMessages = [...conversation];
-            console.log('[AudioRecorder] Updated conversation state:', this.conversationMessages);
+            if (this._uiUpdateTimer) {
+                clearTimeout(this._uiUpdateTimer);
+            }
+
+            this._uiUpdateTimer = setTimeout(() => {
+                console.log('[AudioRecorder] Conversation state changed:', conversation);
+                this.conversationMessages = [...conversation];
+                console.log('[AudioRecorder] Updated conversation state:', this.conversationMessages);
+
+                // Schedule scroll after state update
+                requestAnimationFrame(() => {
+                    this.scrollToLatestMessage();
+                });
+            }, 16); // Roughly one frame at 60fps
         });
 
-        // Bind message handler for server events
+        // Optimize message handling
         this.messagingService.addMessageHandler((messageData) => {
-            this.handleServerMessage(messageData);
+            requestAnimationFrame(() => {
+                this.handleServerMessage(messageData);
+            });
         });
     }
 
@@ -88,20 +113,25 @@ export default class AudioRecorder extends LightningElement {
         this.selectedDeviceId = event.target.value;
     }
 
+    // Optimize device initialization
     async initializeRecording() {
+        if (this.uiState.isInitializing) return;
+
         try {
+            this.uiState.isInitializing = true;
+
             if (!this.selectedDeviceId) {
                 throw new Error('Please select a microphone device first');
             }
 
-            await this.audioDeviceService.initialize(this.selectedDeviceId);
-            await this.whisperService.initialize();
-            await this.messagingService.initialize();
+            // Initialize services in parallel where possible
+            await Promise.all([
+                this.audioDeviceService.initialize(this.selectedDeviceId),
+                this.whisperService.initialize(),
+                this.messagingService.initialize()
+            ]);
 
-            // Initialize messaging service and store conversation details
             this.micInitialized = true;
-
-            // Add system message through conversation state service
             this.conversationStateService.addMessage('Conversation initialized successfully', 'system', 'System', true);
 
             this.dispatchEvent(
@@ -113,8 +143,9 @@ export default class AudioRecorder extends LightningElement {
             );
         } catch (error) {
             this.handleError(error);
-            // If there's an error with messaging service, we should clean up
             this.cleanup();
+        } finally {
+            this.uiState.isInitializing = false;
         }
     }
 
@@ -134,89 +165,138 @@ export default class AudioRecorder extends LightningElement {
         }
     }
 
+    // Batch state updates method
+    batchStateUpdates(updates) {
+        if (this._stateUpdateTimeout) {
+            clearTimeout(this._stateUpdateTimeout);
+        }
+
+        this._stateUpdateTimeout = setTimeout(() => {
+            requestAnimationFrame(() => {
+                Object.entries(updates).forEach(([key, value]) => {
+                    this[key] = value;
+                });
+            });
+        }, 16); // One frame at 60fps
+    }
+
+    // Optimize recording start
     async startRecording() {
-        this.isManualStop = false;
+        if (this.uiState.isTransitioning) return;
+
         try {
-            // Check if the microphone is initialized
+            this.uiState.isTransitioning = true;
+
+            // Batch initial state updates
+            this.batchStateUpdates({
+                isManualStop: false,
+                autoStopEnabled: true,
+                isRecording: true,
+                isProcessingAgentResponse: false
+            });
+
             if (!this.micInitialized) {
                 throw new Error('Please initialize the microphone first');
             }
 
-            // Re-enable auto-stop when starting a new recording
-            this.autoStopEnabled = true;
-
-            // Clean up any existing transcription bubbles first
-            this.conversationStateService.removeCurrentTranscription();
-
-            // Share the audio stream with the WhisperService
-            window.audioStream = this.audioDeviceService.stream;
-
-            // Initialize and start silence detection
-            await this.silenceDetectionService.initialize(this.audioDeviceService.stream, {
-                onSilenceDetected: () => this.handleSilenceDetected(),
-                onSilenceProgress: (duration) => this.handleSilenceProgress(duration)
-            });
-            this.silenceDetectionService.start();
-
-            // Reset current transcription
-            this.conversationStateService.removeCurrentTranscription();
-
-            // Set recording state and loading state
-            this.isRecording = true;
-            this.isProcessingAgentResponse = false;
+            await this.prepareRecordingState();
+            await this.initializeRecordingServices();
 
             console.log('Starting whisper service with real-time transcription...');
-            await this.whisperService.start(
-                // Real-time transcription update callback
-                (transcription) => {
-                    console.log('Received real-time transcription:', transcription);
-                    this.conversationStateService.updateCurrentTranscription(transcription);
-                },
-                // Error callback
-                (error) => {
-                    console.error('Real-time transcription error:', error);
-                    this.handleError(error);
-                }
-            );
+            await this.startWhisperService();
 
             console.log('Recording started successfully');
         } catch (error) {
             this.handleError(error);
-            this.isRecording = false;
+            this.batchStateUpdates({
+                isRecording: false
+            });
+        } finally {
+            this.uiState.isTransitioning = false;
         }
     }
 
+    // Helper method to prepare recording state
+    async prepareRecordingState() {
+        this.conversationStateService.removeCurrentTranscription();
+        window.audioStream = this.audioDeviceService.stream;
+        this.isRecording = true;
+        this.isProcessingAgentResponse = false;
+    }
+
+    // Helper method to initialize recording services
+    async initializeRecordingServices() {
+        await this.silenceDetectionService.initialize(this.audioDeviceService.stream, {
+            onSilenceDetected: () => requestAnimationFrame(() => this.handleSilenceDetected()),
+            onSilenceProgress: (duration) => requestAnimationFrame(() => this.handleSilenceProgress(duration))
+        });
+        this.silenceDetectionService.start();
+    }
+
+    // Helper method to start whisper service
+    async startWhisperService() {
+        await this.whisperService.start(
+            (transcription) =>
+                requestAnimationFrame(() => {
+                    console.log('Received real-time transcription:', transcription);
+                    this.conversationStateService.updateCurrentTranscription(transcription);
+                }),
+            (error) => {
+                console.error('Real-time transcription error:', error);
+                this.handleError(error);
+            }
+        );
+    }
+
+    // Optimize scroll behavior
+    scrollToLatestMessage() {
+        const container = this.template.querySelector('.conversation-container');
+        if (container) {
+            const scrollOptions = {
+                top: 0,
+                behavior: 'smooth'
+            };
+
+            // If there's a typing indicator, prioritize scrolling to it
+            const typingIndicator = this.template.querySelector('.typing-indicator');
+            if (typingIndicator && this.isAnotherParticipantTyping) {
+                typingIndicator.classList.add('visible');
+                container.scrollTo(scrollOptions);
+                return;
+            }
+
+            // Otherwise, scroll to the top where the newest message is
+            container.scrollTo(scrollOptions);
+        }
+    }
+
+    // Optimize stop recording
     async stopRecording() {
         if (this.isManualStop) {
-            this.isManualStop = false;
+            this.batchStateUpdates({
+                isManualStop: false
+            });
             return;
         }
 
         try {
-            // 1. Stop silence detection
+            // Batch state updates for stopping
+            this.batchStateUpdates({
+                isRecording: false,
+                isProcessingAgentResponse: true
+            });
+
             this.silenceDetectionService.stop();
-
-            // 2. Stop recording and mark state
             this.whisperService.stop();
-            this.isRecording = false;
-
-            // 3. Remove current transcription
             this.conversationStateService.removeCurrentTranscription();
             this.currentTranscription = null;
 
-            // 4. Get final transcription
             const finalTranscription = await this.whisperService.getFinalTranscription();
 
-            // Only proceed if we have a valid transcription
-            if (finalTranscription && finalTranscription.trim()) {
-                // 5. Start processing state
-                this.isProcessingAgentResponse = true;
-
-                // 6. Add the final user message
+            if (finalTranscription?.trim()) {
                 this.conversationStateService.addMessage(finalTranscription.trim(), 'user', 'You', false);
 
                 try {
-                    // 7. Send message to messaging service
                     console.log('Sending message to agent:', finalTranscription);
                     await this.messagingService.sendMessage(finalTranscription);
                     console.log('Message sent successfully, waiting for response through events');
@@ -230,16 +310,17 @@ export default class AudioRecorder extends LightningElement {
                         true
                     );
                     this.handleConversationContinuation();
-                } finally {
-                    this.isProcessingAgentResponse = false;
                 }
             } else {
                 this.handleConversationContinuation();
             }
         } catch (error) {
             this.handleError(error);
-            this.isProcessingAgentResponse = false;
             this.handleConversationContinuation();
+        } finally {
+            this.batchStateUpdates({
+                isProcessingAgentResponse: false
+            });
         }
     }
 
@@ -251,19 +332,6 @@ export default class AudioRecorder extends LightningElement {
                     this.startRecording();
                 }
             }, 1000);
-        }
-    }
-
-    // Update scrollToLatestMessage to work with reversed layout
-    scrollToLatestMessage() {
-        // Get the conversation container
-        const container = this.template.querySelector('.conversation-container');
-        if (container) {
-            // In a reversed layout, new messages are at the top, so scroll to 0
-            container.scrollTo({
-                top: 0,
-                behavior: 'smooth'
-            });
         }
     }
 
@@ -433,34 +501,58 @@ export default class AudioRecorder extends LightningElement {
     }
 
     handleTypingIndicator(messageData) {
-        console.log('[AudioRecorder] Handling typing indicator:', JSON.stringify(messageData, null, 2));
-
+        console.log('[AudioRecorder] Handling typing indicator:', messageData);
         const { actor, type } = messageData;
         if (!actor || !actor.actorName) {
             console.warn('[AudioRecorder] Missing actor information in typing indicator event');
             return;
         }
 
-        if (type === 'typing_started') {
-            // Add to typing participants if not already present
-            if (!this.typingParticipants.some((p) => p.name === actor.actorName)) {
-                this.typingParticipants = [
-                    ...this.typingParticipants,
-                    {
-                        name: actor.actorName,
-                        role: actor.role,
-                        timestamp: new Date().toISOString()
-                    }
-                ];
+        requestAnimationFrame(() => {
+            if (type === 'typing_started') {
+                // Add to typing participants if not already present
+                if (!this.typingParticipants.some((p) => p.name === actor.actorName)) {
+                    this.typingParticipants = [
+                        ...this.typingParticipants,
+                        {
+                            name: actor.actorName,
+                            role: actor.role,
+                            timestamp: new Date().toISOString()
+                        }
+                    ];
+                }
+            } else {
+                // Remove from typing participants
+                this.typingParticipants = this.typingParticipants.filter((p) => p.name !== actor.actorName);
             }
-        } else {
-            // Remove from typing participants
-            this.typingParticipants = this.typingParticipants.filter((p) => p.name !== actor.actorName);
-        }
 
-        // Update the typing indicator visibility
-        this.isAnotherParticipantTyping = this.typingParticipants.length > 0;
-        console.log('[AudioRecorder] Updated typing participants:', this.typingParticipants);
+            // Update the typing indicator visibility
+            this.isAnotherParticipantTyping = this.typingParticipants.length > 0;
+
+            // If typing started, scroll to the typing indicator
+            if (this.isAnotherParticipantTyping) {
+                this.scrollToTypingIndicator();
+            }
+        });
+    }
+
+    // Add new method to scroll to typing indicator
+    scrollToTypingIndicator() {
+        requestAnimationFrame(() => {
+            const container = this.template.querySelector('.conversation-container');
+            const typingIndicator = this.template.querySelector('.typing-indicator');
+
+            if (container && typingIndicator) {
+                // Add visible class for animation
+                typingIndicator.classList.add('visible');
+
+                // Scroll to top where typing indicator is
+                container.scrollTo({
+                    top: 0,
+                    behavior: 'smooth'
+                });
+            }
+        });
     }
 
     handleParticipantChange(messageData) {
@@ -685,28 +777,27 @@ export default class AudioRecorder extends LightningElement {
         return remaining;
     }
 
-    // Modify the stop button click handler
+    // Optimize handle stop click
     handleStopClick() {
-        this.isManualStop = true;
-        this.autoStopEnabled = false;
+        this.batchStateUpdates({
+            isManualStop: true,
+            autoStopEnabled: false,
+            isRecording: false,
+            isProcessingAgentResponse: false
+        });
 
-        // Stop all ongoing processes
         this.silenceDetectionService.stop();
         this.whisperService.stop();
-        this.isRecording = false;
-        this.isProcessingAgentResponse = false;
 
-        // Stop audio playback if it's playing
         if (this.isPlayingAudio && this.audioElement) {
             this.audioElement.pause();
             this.audioElement.src = '';
-            this.isPlayingAudio = false;
+            this.batchStateUpdates({
+                isPlayingAudio: false
+            });
         }
 
-        // Clean up any ongoing transcription messages
         this.conversationStateService.removeCurrentTranscription();
-
-        // Add a message indicating the conversation was stopped
         this.conversationStateService.addMessage('Conversation stopped by user', 'system', 'System', true);
     }
 
@@ -720,7 +811,8 @@ export default class AudioRecorder extends LightningElement {
                 }
                 return true;
             })
-            .reverse(); // Reverse the array to show newest messages at the top
+            .slice() // Create a copy of the array
+            .reverse(); // Show newest messages at the top
     }
 
     handleRoutingEvent(routingData) {
