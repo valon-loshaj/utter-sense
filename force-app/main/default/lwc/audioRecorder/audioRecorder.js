@@ -283,17 +283,21 @@ export default class AudioRecorder extends LightningElement {
             // Batch state updates for stopping
             this.batchStateUpdates({
                 isRecording: false,
-                isProcessingAgentResponse: true
+                isProcessingAgentResponse: true // Keep this for the loading indicator.
             });
 
             this.silenceDetectionService.stop();
             this.whisperService.stop();
-            this.conversationStateService.removeCurrentTranscription();
-            this.currentTranscription = null;
 
+            // Get the final transcription *before* removing the preview
             const finalTranscription = await this.whisperService.getFinalTranscription();
 
+            // Remove the current transcription (preview) *immediately*.
+            this.conversationStateService.removeCurrentTranscription();
+            this.currentTranscription = null; // Ensure it's cleared
+
             if (finalTranscription?.trim()) {
+                // Add the *final* transcription as a user message
                 this.conversationStateService.addMessage(finalTranscription.trim(), 'user', 'You', false);
 
                 try {
@@ -312,12 +316,14 @@ export default class AudioRecorder extends LightningElement {
                     this.handleConversationContinuation();
                 }
             } else {
+                //if there is no final transcription, resume
                 this.handleConversationContinuation();
             }
         } catch (error) {
             this.handleError(error);
             this.handleConversationContinuation();
         } finally {
+            // Set this to false *after* processing, so the loading indicator shows
             this.batchStateUpdates({
                 isProcessingAgentResponse: false
             });

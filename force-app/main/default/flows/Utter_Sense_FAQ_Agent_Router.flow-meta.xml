@@ -39,16 +39,40 @@
             </value>
         </inputParameters>
         <inputParameters>
+            <name>routingConfigId</name>
+        </inputParameters>
+        <inputParameters>
+            <name>routingConfigLabel</name>
+        </inputParameters>
+        <inputParameters>
             <name>queueId</name>
             <value>
                 <stringValue>00GKB000001JbUx2AK</stringValue>
             </value>
         </inputParameters>
         <inputParameters>
+            <name>agentId</name>
+        </inputParameters>
+        <inputParameters>
+            <name>agentLabel</name>
+        </inputParameters>
+        <inputParameters>
             <name>queueLabel</name>
             <value>
                 <stringValue>Messaging Queue</stringValue>
             </value>
+        </inputParameters>
+        <inputParameters>
+            <name>skillOption</name>
+        </inputParameters>
+        <inputParameters>
+            <name>skillRequirementsResourceItem</name>
+        </inputParameters>
+        <inputParameters>
+            <name>botId</name>
+        </inputParameters>
+        <inputParameters>
+            <name>botLabel</name>
         </inputParameters>
         <inputParameters>
             <name>copilotId</name>
