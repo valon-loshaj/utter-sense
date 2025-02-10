@@ -53,5 +53,9 @@
 		<members>Utter_Sense_Certificate</members>
 		<name>Certificate</name>
 	</types>
-	<version>63.0</version>
+	<types>
+		<members>Messaging_Queue</members>
+		<name>Queue</name>
+	</types>
+	<version>62.0</version>
 </Package>
