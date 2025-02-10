@@ -1,6 +1,7 @@
 import getAccessToken from '@salesforce/apex/AudioRecorderController.getAccessToken';
 import createConversation from '@salesforce/apex/AudioRecorderController.createConversation';
 import sendMessage from '@salesforce/apex/AudioRecorderController.sendMessage';
+import setMessagingConfiguration from '@salesforce/apex/AudioRecorderController.setMessagingConfiguration';
 import { EventSourceService } from './eventSourceService';
 
 export class MessagingService {
@@ -11,11 +12,19 @@ export class MessagingService {
         this.accessToken = null;
         this.conversationId = null;
         this.lastMessageId = null;
+        this.configurationName = null;
     }
 
-    async initialize() {
+    async initialize(configName) {
         try {
             console.log('[MessagingService] Starting initialization');
+
+            // Set the configuration first
+            if (configName) {
+                console.log('[MessagingService] Setting configuration:', configName);
+                this.configurationName = configName;
+                await setMessagingConfiguration({ configName });
+            }
 
             // First get the access token
             console.log('[MessagingService] Requesting access token');

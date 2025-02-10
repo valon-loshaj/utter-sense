@@ -1,18 +1,133 @@
 public with sharing class AgentMessagingService {
     // Constants for service configuration
-    private static final String BOT_DEVELOPER_NAME = 'Utter_Sense_ES';
-    private static final String CLIENT_TYPE = '63';
-    private static final String CLIENT_VERSION = '1';
-    private static final String AUTH_URL = '/authorization/unauthenticated/access-token';
-    private static final String CONVRESATION_URL = '/conversation';
-    private static final String MESSAGE_URL = '/conversation/{{conversationId}}/message';
-    private static final String BASE_URL = 'https://accenture-1c1--genaidev2.sandbox.my.salesforce-scrt.com/iamessage/api/v2';
-    private static final String ISSUER = UserInfo.getOrganizationId();
-    private static final String SUBJECT = UserInfo.getUserId();
-    private static final Integer TOKEN_EXPIRY = 300; // 5 minutes in seconds
-    private static final String CERTIFICATE_NAME = 'Utter_Sense_Certificate';
-    private static final String PLATFORM = 'Web';
-    private static final String CAPABILITIES_VERSION = '1';
+    private static String BOT_DEVELOPER_NAME;
+    private static String AUTH_URL;
+    private static String CONVRESATION_URL;
+    private static String MESSAGE_URL;
+    private static String BASE_URL;
+    private static String ISSUER = UserInfo.getOrganizationId();
+    private static String SUBJECT = UserInfo.getUserId();
+    private static Integer TOKEN_EXPIRY;
+    private static String CERTIFICATE_NAME;
+    private static String PLATFORM = 'Web';
+    private static String CAPABILITIES_VERSION;
+    
+    // Configuration metadata
+    private static Utter_Sense_Audio_Recorder_Configs__mdt audioRecorderConfig;
+    private static final String DEFAULT_CONFIG_NAME = 'Utter_Sense_Configs';
+    private static String configurationName;
+    
+    // Custom exception for configuration errors
+    public class ConfigurationException extends Exception {}
+    
+    /**
+     * @description Sets the configuration name to be used for retrieving custom metadata
+     * @param configName The developer name of the custom metadata record to use
+     * @throws ConfigurationException if the configuration cannot be loaded
+     */
+    @AuraEnabled
+    public static void setConfigurationName(String configName) {
+        try {
+            if (String.isBlank(configName)) {
+                throw new ConfigurationException('Configuration name cannot be blank');
+            }
+            configurationName = configName;
+            initializeConfiguration();
+        } catch (Exception e) {
+            System.debug(LoggingLevel.ERROR, 'Error setting configuration name: ' + e.getMessage());
+            System.debug(LoggingLevel.ERROR, 'Stack trace: ' + e.getStackTraceString());
+            throw new AuraHandledException('Failed to set configuration: ' + e.getMessage());
+        }
+    }
+    
+    /**
+     * @description Gets the current configuration name being used
+     * @return String The developer name of the custom metadata record
+     */
+    public static String getConfigurationName() {
+        return String.isBlank(configurationName) ? DEFAULT_CONFIG_NAME : configurationName;
+    }
+    
+    /**
+     * @description Initializes the configuration using the current configuration name
+     * @throws ConfigurationException if configuration cannot be loaded
+     */
+    private static void initializeConfiguration() {
+        try {
+            // Get the configuration record using the current configuration name
+            audioRecorderConfig = Utter_Sense_Audio_Recorder_Configs__mdt.getInstance(getConfigurationName());
+            
+            // Validate that the configuration exists
+            if (audioRecorderConfig == null) {
+                throw new ConfigurationException('Audio Recorder configuration "' + getConfigurationName() + '" not found. Please ensure the custom metadata record exists.');
+            }
+            
+            // Validate required fields and initialize constants
+            validateAndInitializeConfig();
+            
+        } catch (Exception e) {
+            // Log the error and throw a more user-friendly message
+            System.debug(LoggingLevel.ERROR, 'Failed to initialize AgentMessagingService configuration: ' + e.getMessage());
+            System.debug(LoggingLevel.ERROR, 'Stack trace: ' + e.getStackTraceString());
+            throw new ConfigurationException('Failed to initialize messaging service configuration. Please contact your system administrator.');
+        }
+    }
+    
+    // Static initialization block to load default configuration
+    static {
+        initializeConfiguration();
+    }
+    
+    /**
+     * @description Validates configuration fields and initializes constants
+     * @throws ConfigurationException if required fields are missing
+     */
+    private static void validateAndInitializeConfig() {
+        // Validate and initialize each required field
+        if (String.isBlank(audioRecorderConfig.Bot_Developer_Name__c)) {
+            throw new ConfigurationException('Bot Developer Name is required in the configuration.');
+        }
+        BOT_DEVELOPER_NAME = audioRecorderConfig.Bot_Developer_Name__c;
+        
+        if (String.isBlank(audioRecorderConfig.Auth_URL__c)) {
+            throw new ConfigurationException('Auth URL is required in the configuration.');
+        }
+        AUTH_URL = audioRecorderConfig.Auth_URL__c;
+        
+        if (String.isBlank(audioRecorderConfig.Conversation_Endpoint__c)) {
+            throw new ConfigurationException('Conversation Endpoint is required in the configuration.');
+        }
+        CONVRESATION_URL = audioRecorderConfig.Conversation_Endpoint__c;
+        
+        if (String.isBlank(audioRecorderConfig.Message_Endpoint__c)) {
+            throw new ConfigurationException('Message Endpoint is required in the configuration.');
+        }
+        MESSAGE_URL = audioRecorderConfig.Message_Endpoint__c;
+        
+        if (String.isBlank(audioRecorderConfig.Base_URL__c)) {
+            throw new ConfigurationException('Base URL is required in the configuration.');
+        }
+        BASE_URL = audioRecorderConfig.Base_URL__c;
+        
+        if (audioRecorderConfig.Token_Expiration_in_Seconds__c == null) {
+            throw new ConfigurationException('Token Expiration is required in the configuration.');
+        }
+        try {
+            TOKEN_EXPIRY = Integer.valueOf(audioRecorderConfig.Token_Expiration_in_Seconds__c);
+        } catch (Exception e) {
+            throw new ConfigurationException('Token Expiration must be a valid integer.');
+        }
+        
+        if (String.isBlank(audioRecorderConfig.Certificate_API_Name__c)) {
+            throw new ConfigurationException('Certificate API Name is required in the configuration.');
+        }
+        CERTIFICATE_NAME = audioRecorderConfig.Certificate_API_Name__c;
+        
+        if (String.isBlank(audioRecorderConfig.Capabilities_Version__c)) {
+            throw new ConfigurationException('Capabilities Version is required in the configuration.');
+        }
+        CAPABILITIES_VERSION = audioRecorderConfig.Capabilities_Version__c;
+    }
     
     // Inner class to handle responses
     public class MessagingResponse {
@@ -25,6 +140,22 @@ public with sharing class AgentMessagingService {
         @AuraEnabled public String text { get; set; }
         
         public MessagingResponse() {}
+    }
+    
+    /**
+     * @description Retrieves the Audio Recorder configuration from custom metadata
+     * @return Utter_Sense_Audio_Recorder_Configs__mdt The configuration record
+     * @throws ConfigurationException if the configuration is not found
+     */
+    @TestVisible
+    private static Utter_Sense_Audio_Recorder_Configs__mdt getAudioRecorderConfig() {
+        if (audioRecorderConfig == null) {
+            audioRecorderConfig = Utter_Sense_Audio_Recorder_Configs__mdt.getInstance('Utter_Sense_Configs');
+            if (audioRecorderConfig == null) {
+                throw new ConfigurationException('Audio Recorder configuration "Utter_Sense_Configs" not found. Please ensure the custom metadata record exists.');
+            }
+        }
+        return audioRecorderConfig;
     }
     
     /**
@@ -111,7 +242,7 @@ public with sharing class AgentMessagingService {
             Map<String, Object> requestBody = new Map<String, Object>{
                 'orgId' => ISSUER,
                 'esDeveloperName' => BOT_DEVELOPER_NAME,
-                'capabilitiesVersion' => CLIENT_VERSION,
+                'capabilitiesVersion' => CAPABILITIES_VERSION,
                 'platform' => 'Web'
             };
             System.debug('Request Body: ' + JSON.serializePretty(requestBody));

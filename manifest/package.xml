@@ -30,18 +30,10 @@
 		<name>bot</name>
 	</types>
 	<types>
-		<members>*</members>
-		<name>genaifunction</name>
-	</types>
-	<types>
 		<members>Utter_Sense_FAQ</members>
 		<name>genaiprompttemplate</name>
 	</types>
 	<types>
-		<members>*</members>
-		<name>genaiplugin</name>
-	</types>
-		<types>
 		<members>*</members>
 		<name>genaiprompttemplateactv</name>
 	</types>
@@ -50,12 +42,12 @@
 		<name>genaiplanner</name>
 	</types>
 	<types>
-		<members>Utter_Sense_Certificate</members>
-		<name>Certificate</name>
+		<members>Utter_Sense_Msg_Queue</members>
+		<name>Queue</name>
 	</types>
 	<types>
-		<members>Messaging_Queue</members>
-		<name>Queue</name>
+		<members>Utter_Sense_Audio_Recorder_Configs__mdt</members>
+		<name>CustomObject</name>
 	</types>
 	<version>62.0</version>
 </Package>

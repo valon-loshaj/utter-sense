@@ -1,4 +1,20 @@
 public with sharing class AudioRecorderController {
+	private static String configurationName;
+
+	/**
+	 * @description Sets the configuration name for the messaging service
+	 * @param configName The developer name of the custom metadata configuration to use
+	 */
+	@AuraEnabled
+	public static void setMessagingConfiguration(String configName) {
+		try {
+			AgentMessagingService.setConfigurationName(configName);
+			configurationName = configName;
+		} catch (Exception e) {
+			throw new AuraHandledException(e.getMessage());
+		}
+	}
+
 	@AuraEnabled
 	public static AgentResponse getAgentResponse(String input) {
 		try {

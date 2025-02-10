@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
+    <description>Contains the configuration details of the Utter Sense Audio Recorder component.</description>
+    <label>Utter Sense Audio Recorder Config</label>
+    <pluralLabel>Utter Sense Audio Recorder Configs</pluralLabel>
+    <visibility>Public</visibility>
+</CustomObject>
