@@ -673,7 +673,7 @@ export default class AudioRecorder extends LightningElement {
 
     // Existing getter for disabling record button
     get notRecording() {
-        return this.isRecording || !this.micInitialized;
+        return this.isRecording;
     }
 
     // Add getter for stop button disabled state
@@ -907,5 +907,32 @@ export default class AudioRecorder extends LightningElement {
         if (trimmedText) {
             this.conversationMessages = [...this.conversationMessages, previewMessage];
         }
+    }
+
+    // New method to handle microphone click
+    async handleMicrophoneClick() {
+        if (this.uiState.isInitializing || this.uiState.isTransitioning) return;
+
+        try {
+            if (!this.micInitialized) {
+                // Initialize microphone first
+                await this.initializeRecording();
+                // Then start recording if initialization was successful
+                if (this.micInitialized) {
+                    await this.startRecording();
+                }
+            } else {
+                // If already initialized, just start recording
+                await this.startRecording();
+            }
+        } catch (error) {
+            this.handleError(error);
+            this.cleanup();
+        }
+    }
+
+    // Update empty conversation message
+    get emptyConversationMessage() {
+        return 'Click the microphone icon to start a conversation.';
     }
 }

@@ -1,13 +1,16 @@
 {
-	"orgName": "valon.loshaj company",
-	"edition": "Developer",
-	"features": ["EnableSetPasswordInApi"],
-	"settings": {
-		"lightningExperienceSettings": {
-			"enableS1DesktopEnabled": true
-		},
-		"mobileSettings": {
-			"enableS1EncryptedStoragePref2": false
-		}
-	}
+    "orgName": "Utter Sense Sandbox",
+    "edition": "Developer",
+    "features": ["EnableSetPasswordInApi, Einstein1AIPlatform", "LiveAgent", "LiveMessage", "LightningServiceConsole"],
+    "settings": {
+        "lightningExperienceSettings": {
+            "enableS1DesktopEnabled": true
+        },
+        "mobileSettings": {
+            "enableS1EncryptedStoragePref2": false
+        },
+        "einsteinGptSettings": {
+            "enableEinsteinGptPlatform": true
+        }
+    }
 }

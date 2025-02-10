@@ -24,9 +24,10 @@
     display: flex;
     flex-wrap: wrap;
     gap: 1rem;
-    contain: layout; /* Remove style containment */
-    margin-bottom: 1rem; /* Add spacing */
-    min-height: 40px; /* Ensure minimum height */
+    contain: layout;
+    margin-bottom: 1rem;
+    min-height: 40px;
+    justify-content: center;
 }
 
 @container recorder (max-width: 400px) {
@@ -35,35 +36,72 @@
     }
 }
 
-/* Button Styles */
-button {
-    background-color: var(--slds-c-button-brand-color-background, #0176d3);
-    border: 0;
-    border-radius: 0.25rem;
-    color: #fff;
+/* Icon Button Styles */
+.icon-button {
+    background-color: transparent;
+    border: 2px solid var(--slds-c-button-brand-color-background, #0176d3);
+    border-radius: 50%;
+    color: var(--slds-c-button-brand-color-background, #0176d3);
     cursor: pointer;
-    padding: 0.5rem 1rem;
-    transition: background-color 0.2s ease, opacity 0.2s ease;
-    min-width: 160px; /* Prevent button size changes */
-    min-height: 40px; /* Ensure consistent height */
-    position: relative; /* For loading state */
-    transform: translateZ(0); /* GPU acceleration */
+    padding: 0.75rem;
+    transition: all 0.2s ease;
+    min-width: unset;
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    transform: translateZ(0);
 }
 
-button:disabled {
-    background-color: var(--slds-c-button-disabled-color-background, #c9c9c9);
+.icon-button:hover:not(:disabled) {
+    background-color: var(--slds-c-button-brand-color-background, #0176d3);
+    color: white;
+    transform: scale(1.05) translateZ(0);
+}
+
+.icon-button:disabled {
+    background-color: transparent;
+    border-color: var(--slds-c-button-disabled-color-background, #c9c9c9);
+    color: var(--slds-c-button-disabled-color-background, #c9c9c9);
     cursor: not-allowed;
     opacity: 0.7;
 }
 
-button:disabled::after {
-    content: 'Initializing...';
-    position: absolute;
-    left: 50%;
-    top: 50%;
-    transform: translate(-50%, -50%);
-    opacity: 0.7;
-    pointer-events: none;
+.icon-button svg {
+    width: 24px;
+    height: 24px;
+    transition: transform 0.2s ease;
+}
+
+.icon-button:active:not(:disabled) svg {
+    transform: scale(0.95);
+}
+
+.mic-button {
+    background-color: var(--slds-c-button-brand-color-background, #0176d3);
+    color: white;
+}
+
+.mic-button:disabled {
+    background-color: var(--slds-c-button-disabled-color-background, #c9c9c9);
+    color: white;
+}
+
+.stop-button {
+    border-color: #ba0517;
+    color: #ba0517;
+}
+
+.stop-button:hover:not(:disabled) {
+    background-color: #ba0517;
+    color: white;
+}
+
+.stop-button:disabled {
+    border-color: var(--slds-c-button-disabled-color-background, #c9c9c9);
+    color: var(--slds-c-button-disabled-color-background, #c9c9c9);
 }
 
 /* Device Selection */
