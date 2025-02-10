@@ -16,6 +16,8 @@ Before installing this package, ensure you have:
 -   Prompt Builder permission sets assigned to users who will be using this feature
 -   Salesforce CLI installed on your machine
 -   OpenAI API key for audio transcription and text-to-speech features
+-   Omni-Channel routing enabled and configured for message session routing
+-   SCRT URL for your embedded service deployment
 
 ## Installation 🚀
 
@@ -29,26 +31,42 @@ sf project deploy start -d force-app
 3. Assign the Utter Sense permissions to users:
 
 ```bash
-sf org assign permset --name Utter_Sense_Permissions --target-org genDev2
+sf org assign permset --name Utter_Sense_Permissions --target-org your-org-alias
 ```
 
-4. Configure OpenAI Settings:
+4. Configure Remote Site Settings:
+
+    - Navigate to Setup > Remote Site Settings
+    - Click "New Remote Site"
+    - Enter a name for your remote site (e.g., "Utter_Sense_SCRT_Domain")
+    - Add your SCRT URL for the embedded service deployment
+    - Ensure the "Active" checkbox is selected
+    - Click "Save"
+
+5. Configure Trusted URLs:
+
+    - Navigate to Setup > Security > Trusted URLs
+    - Click "New Trusted URL"
+    - Add your SCRT URL for the embedded service deployment
+    - Click "Save"
+
+6. Configure OpenAI Settings:
 
     - Navigate to Setup > Custom Settings
     - Find "OpenAI Settings" and click "Manage"
     - Create a new record and enter your OpenAI API key
 
-5. Configure Utter Sense Audio Recorder Settings:
+7. Configure Utter Sense Audio Recorder Settings:
 
     - Navigate to Setup > Custom Metadata Types
     - Find "Utter Sense Audio Recorder Config" and click "Manage Records"
     - Create a new configuration record with your desired settings
     - Note the Developer Name of your configuration as you'll need it for the next step
 
-6. Configure the Audio Recorder Component:
+8. Configure the Audio Recorder Component:
     - When adding the Audio Recorder component to a Lightning Record Page
     - In the component's properties, locate "Configuration Developer Name"
-    - Enter the Developer Name of the configuration you created in step 5
+    - Enter the Developer Name of the configuration you created in step 7
     - This allows you to specify which configuration the component should use
 
 ## Features 🌟
