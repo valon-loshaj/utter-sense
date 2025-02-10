@@ -17,13 +17,13 @@
         <inputParameters>
             <name>serviceChannelId</name>
             <value>
-                <stringValue>0N9KB000000cR0M0AU</stringValue>
+                <stringValue>0N9Ho000000Pj8uKAC</stringValue>
             </value>
         </inputParameters>
         <inputParameters>
             <name>serviceChannelLabel</name>
             <value>
-                <stringValue>Messaging</stringValue>
+                <stringValue>LiveMessage</stringValue>
             </value>
         </inputParameters>
         <inputParameters>
@@ -47,7 +47,7 @@
         <inputParameters>
             <name>queueId</name>
             <value>
-                <stringValue>00GKB000001JbUx2AK</stringValue>
+                <stringValue>00GDw000003pByrMAE</stringValue>
             </value>
         </inputParameters>
         <inputParameters>
@@ -59,7 +59,7 @@
         <inputParameters>
             <name>queueLabel</name>
             <value>
-                <stringValue>Messaging Queue</stringValue>
+                <stringValue>Utter Sense Msg Queue</stringValue>
             </value>
         </inputParameters>
         <inputParameters>
@@ -77,7 +77,7 @@
         <inputParameters>
             <name>copilotId</name>
             <value>
-                <stringValue>0XxKB000000bvGI0AY</stringValue>
+                <stringValue>0XxDw0000008OctKAE</stringValue>
             </value>
         </inputParameters>
         <inputParameters>
@@ -88,7 +88,6 @@
         </inputParameters>
         <nameSegment>routeWork</nameSegment>
         <offset>0</offset>
-        <versionSegment>1</versionSegment>
     </actionCalls>
     <apiVersion>62.0</apiVersion>
     <environments>Default</environments>

@@ -50,7 +50,8 @@ module.exports = [
                 fetch: 'readonly',
                 URLSearchParams: 'readonly',
                 EventSource: 'readonly',
-                Event: 'readonly'
+                Event: 'readonly',
+                Promise: 'readonly'
             },
             parser: require('@babel/eslint-parser'),
             parserOptions: {

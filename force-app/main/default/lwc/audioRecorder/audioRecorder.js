@@ -1,4 +1,4 @@
-import { LightningElement, track, wire } from 'lwc';
+import { LightningElement, track, wire, api } from 'lwc';
 import { AudioDeviceService } from './audioDeviceService';
 import { WhisperService } from './whisperService';
 import { MessagingService } from './messagingService';
@@ -10,8 +10,10 @@ import EINSTEIN_LOGO from '@salesforce/resourceUrl/UtterSenseEinsteinLogo';
 import USER_ID from '@salesforce/user/Id';
 import FIRST_NAME_FIELD from '@salesforce/schema/User.FirstName';
 import LAST_NAME_FIELD from '@salesforce/schema/User.LastName';
+import setConfigurationName from '@salesforce/apex/AgentMessagingService.setConfigurationName';
 
 export default class AudioRecorder extends LightningElement {
+    @api configurationDeveloperName;
     @track isRecording = false;
     @track isTranscribing = false;
     @track isProcessingAgentResponse = false;
@@ -128,7 +130,7 @@ export default class AudioRecorder extends LightningElement {
             await Promise.all([
                 this.audioDeviceService.initialize(this.selectedDeviceId),
                 this.whisperService.initialize(),
-                this.messagingService.initialize()
+                this.messagingService.initialize(this.configurationDeveloperName)
             ]);
 
             this.micInitialized = true;
@@ -218,7 +220,6 @@ export default class AudioRecorder extends LightningElement {
 
     // Helper method to prepare recording state
     async prepareRecordingState() {
-        this.conversationStateService.removeCurrentTranscription();
         window.audioStream = this.audioDeviceService.stream;
         this.isRecording = true;
         this.isProcessingAgentResponse = false;
@@ -848,7 +849,6 @@ export default class AudioRecorder extends LightningElement {
             });
         }
 
-        this.conversationStateService.removeCurrentTranscription();
         this.conversationStateService.addMessage('Conversation stopped by user', 'system', 'System', true);
     }
 

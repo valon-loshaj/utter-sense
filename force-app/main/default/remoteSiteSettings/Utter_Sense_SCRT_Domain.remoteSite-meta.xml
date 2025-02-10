@@ -2,5 +2,5 @@
 <RemoteSiteSetting xmlns="http://soap.sforce.com/2006/04/metadata">
     <disableProtocolSecurity>false</disableProtocolSecurity>
     <isActive>true</isActive>
-    <url>https://orgfarm-e0ea23d84f-dev-ed.develop.my.salesforce-scrt.com</url>
+    <url>https://accenture-1c1--genaidev2.sandbox.my.salesforce-scrt.com</url>
 </RemoteSiteSetting>
