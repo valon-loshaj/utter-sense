@@ -235,17 +235,10 @@ export default class AudioRecorder extends LightningElement {
 
     // Helper method to start whisper service
     async startWhisperService() {
-        await this.whisperService.start(
-            (transcription) =>
-                requestAnimationFrame(() => {
-                    console.log('Received real-time transcription:', transcription);
-                    this.conversationStateService.updateCurrentTranscription(transcription);
-                }),
-            (error) => {
-                console.error('Real-time transcription error:', error);
-                this.handleError(error);
-            }
-        );
+        await this.whisperService.start((error) => {
+            console.error('Transcription error:', error);
+            this.handleError(error);
+        });
     }
 
     // Optimize scroll behavior
@@ -280,26 +273,17 @@ export default class AudioRecorder extends LightningElement {
         }
 
         try {
-            // Batch state updates for stopping
             this.batchStateUpdates({
                 isRecording: false,
-                isProcessingAgentResponse: true // Keep this for the loading indicator.
+                isProcessingAgentResponse: true
             });
 
             this.silenceDetectionService.stop();
             this.whisperService.stop();
 
-            // Get the final transcription *before* removing the preview
             const finalTranscription = await this.whisperService.getFinalTranscription();
 
-            // Remove the current transcription (preview) *immediately*.
-            this.conversationStateService.removeCurrentTranscription();
-            this.currentTranscription = null; // Ensure it's cleared
-
             if (finalTranscription?.trim()) {
-                // Add the *final* transcription as a user message
-                this.conversationStateService.addMessage(finalTranscription.trim(), 'user', 'You', false);
-
                 try {
                     console.log('Sending message to agent:', finalTranscription);
                     await this.messagingService.sendMessage(finalTranscription);
@@ -316,14 +300,12 @@ export default class AudioRecorder extends LightningElement {
                     this.handleConversationContinuation();
                 }
             } else {
-                //if there is no final transcription, resume
                 this.handleConversationContinuation();
             }
         } catch (error) {
             this.handleError(error);
             this.handleConversationContinuation();
         } finally {
-            // Set this to false *after* processing, so the loading indicator shows
             this.batchStateUpdates({
                 isProcessingAgentResponse: false
             });
@@ -441,11 +423,33 @@ export default class AudioRecorder extends LightningElement {
         try {
             // Check if this is a user message (final transcription)
             const isUserMessage = messageData.data?.conversationEntry?.sender?.role === 'EndUser';
+            const isAgentMessage =
+                messageData.data?.conversationEntry?.sender?.role === 'Agent' ||
+                messageData.data?.conversationEntry?.sender?.role === 'Bot';
 
-            // If it's a user message, remove any existing preview messages
-            if (isUserMessage) {
-                this.conversationMessages = this.conversationMessages.filter((msg) => msg.type !== 'preview');
+            // Set processing state before handling message
+            this.isProcessingAgentResponse = true;
+
+            // Always clean up preview messages when receiving any message
+            const incomingText = this.extractMessageText(messageData);
+            this.conversationMessages = this.conversationMessages.filter((msg) => {
+                if (msg.type === 'preview') {
+                    // Keep preview only if it's different from incoming message
+                    return incomingText && msg.text !== incomingText;
+                }
+                return true;
+            });
+
+            // Clear current transcription if it matches incoming message
+            if (this.currentTranscription && this.currentTranscription.text === incomingText) {
                 this.currentTranscription = null;
+            }
+
+            // If it's an agent message, clear typing indicator for that agent
+            if (isAgentMessage && messageData.data?.conversationEntry?.senderDisplayName) {
+                const agentName = messageData.data.conversationEntry.senderDisplayName;
+                this.typingParticipants = this.typingParticipants.filter((p) => p.name !== agentName);
+                this.isAnotherParticipantTyping = this.typingParticipants.length > 0;
             }
 
             // Structure the message data
@@ -492,7 +496,6 @@ export default class AudioRecorder extends LightningElement {
                 } catch (audioError) {
                     console.error('[AudioRecorder] Error generating audio:', audioError);
                     this.handleError(new Error('Audio generation failed, but message was received'));
-                    // Even if audio fails, try to continue the conversation
                     this.handleConversationContinuation();
                 }
             }
@@ -503,6 +506,20 @@ export default class AudioRecorder extends LightningElement {
             console.error('[AudioRecorder] Error handling incoming message:', error);
             this.handleError(error);
             this.handleConversationContinuation();
+        } finally {
+            // Reset processing state after handling message
+            this.isProcessingAgentResponse = false;
+        }
+    }
+
+    // Helper method to extract message text
+    extractMessageText(messageData) {
+        try {
+            const entryPayload = JSON.parse(messageData.data?.conversationEntry?.entryPayload || '{}');
+            return entryPayload?.abstractMessage?.staticContent?.text || '';
+        } catch (error) {
+            console.warn('[AudioRecorder] Error extracting message text:', error);
+            return '';
         }
     }
 
@@ -512,6 +529,16 @@ export default class AudioRecorder extends LightningElement {
         if (!actor || !actor.actorName) {
             console.warn('[AudioRecorder] Missing actor information in typing indicator event');
             return;
+        }
+
+        // Clear any existing debounce timeout for this actor
+        if (this._typingDebounceTimers?.get(actor.actorName)) {
+            clearTimeout(this._typingDebounceTimers.get(actor.actorName));
+        }
+
+        // Initialize the map if it doesn't exist
+        if (!this._typingDebounceTimers) {
+            this._typingDebounceTimers = new Map();
         }
 
         requestAnimationFrame(() => {
@@ -527,9 +554,20 @@ export default class AudioRecorder extends LightningElement {
                         }
                     ];
                 }
+
+                // Set a timeout to automatically clear the typing indicator if no update is received
+                this._typingDebounceTimers.set(
+                    actor.actorName,
+                    setTimeout(() => {
+                        this.typingParticipants = this.typingParticipants.filter((p) => p.name !== actor.actorName);
+                        this.isAnotherParticipantTyping = this.typingParticipants.length > 0;
+                        this._typingDebounceTimers.delete(actor.actorName);
+                    }, 3000) // Clear after 3 seconds of no updates
+                );
             } else {
                 // Remove from typing participants
                 this.typingParticipants = this.typingParticipants.filter((p) => p.name !== actor.actorName);
+                this._typingDebounceTimers.delete(actor.actorName);
             }
 
             // Update the typing indicator visibility
@@ -614,6 +652,13 @@ export default class AudioRecorder extends LightningElement {
         this.silenceDetectionService.cleanup();
         this.messagingService.cleanup();
         this.conversationStateService.clearConversation();
+
+        // Clear all typing indicator timers
+        if (this._typingDebounceTimers) {
+            this._typingDebounceTimers.forEach((timer) => clearTimeout(timer));
+            this._typingDebounceTimers.clear();
+        }
+
         if (this.audioElement) {
             this.audioElement.pause();
             this.audioElement.src = '';
@@ -809,16 +854,7 @@ export default class AudioRecorder extends LightningElement {
 
     // Update the conversation getter to maintain correct order
     get conversation() {
-        // When there's a final transcription, filter out preview messages
-        return this.conversationMessages
-            .filter((message) => {
-                if (this.isProcessingAgentResponse) {
-                    return message.type !== 'preview';
-                }
-                return true;
-            })
-            .slice() // Create a copy of the array
-            .reverse(); // Show newest messages at the top
+        return this.conversationMessages.slice().reverse();
     }
 
     handleRoutingEvent(routingData) {
@@ -843,22 +879,33 @@ export default class AudioRecorder extends LightningElement {
 
     // Update current transcription
     updateCurrentTranscription(text) {
-        if (!this.currentTranscription) {
-            // Add preview message for real-time transcription
-            this.currentTranscription = {
-                id: window.crypto.randomUUID(),
-                text: text.trim(),
-                type: 'preview',
-                timestamp: new Date().toISOString(),
-                userName: 'You'
-            };
-            // Add to conversation state
-            this.conversationMessages = [...this.conversationMessages, this.currentTranscription];
-        } else {
-            // Update existing preview message text
-            this.currentTranscription.text = text.trim();
-            // Force a reactive update
-            this.conversationMessages = [...this.conversationMessages];
+        const trimmedText = text.trim();
+
+        // Don't update if we're processing a response or if there's a final version
+        if (
+            this.isProcessingAgentResponse ||
+            this.conversationMessages.some((m) => m.type === 'user' && m.text === trimmedText)
+        ) {
+            return;
+        }
+
+        // Remove any existing preview messages first
+        this.conversationMessages = this.conversationMessages.filter((msg) => msg.type !== 'preview');
+
+        // Create new preview message
+        const previewMessage = {
+            id: window.crypto.randomUUID(),
+            text: trimmedText,
+            type: 'preview',
+            timestamp: new Date().toISOString(),
+            userName: 'You'
+        };
+
+        this.currentTranscription = previewMessage;
+
+        // Only add the preview if it's not empty
+        if (trimmedText) {
+            this.conversationMessages = [...this.conversationMessages, previewMessage];
         }
     }
 }

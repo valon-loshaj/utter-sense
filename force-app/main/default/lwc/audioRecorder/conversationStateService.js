@@ -7,7 +7,6 @@ export class ConversationStateService {
         this.conversation = [];
         this.messageId = 0;
         this.stateChangeHandlers = new Set();
-        this.currentTranscription = null;
         this.typingParticipants = new Map();
         this.isAnotherParticipantTyping = false;
         this._stateUpdateTimeout = null;
@@ -100,45 +99,11 @@ export class ConversationStateService {
         this._isProcessingQueue = false;
     }
 
-    // Update current transcription
-    updateCurrentTranscription(text) {
-        requestAnimationFrame(() => {
-            if (!this.currentTranscription) {
-                this.currentTranscription = this.addMessage(text, 'transcription', 'You', true);
-            } else {
-                this.currentTranscription.text = text;
-                this.notifyStateChange();
-            }
-        });
-    }
-
-    // Remove current transcription
-    removeCurrentTranscription() {
-        if (!this.currentTranscription) return;
-
-        requestAnimationFrame(() => {
-            const index = this.conversation.findIndex((msg) => msg.id === this.currentTranscription.id);
-            if (index !== -1) {
-                this.conversation[index].fadeOut = true;
-                this.notifyStateChange();
-
-                setTimeout(() => {
-                    requestAnimationFrame(() => {
-                        this.conversation = this.conversation.filter((msg) => msg.id !== this.currentTranscription.id);
-                        this.notifyStateChange();
-                    });
-                }, 300);
-            }
-            this.currentTranscription = null;
-        });
-    }
-
     // Clear conversation
     clearConversation() {
         console.log('[ConversationStateService] Clearing conversation');
         this.conversation = [];
         this.messageId = 0;
-        this.currentTranscription = null;
         this.typingParticipants.clear();
         this.isAnotherParticipantTyping = false;
         this.notifyStateChange();

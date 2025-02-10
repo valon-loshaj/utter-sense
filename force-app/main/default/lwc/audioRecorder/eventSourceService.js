@@ -13,8 +13,8 @@ export class EventSourceService {
         this.maxReconnectAttempts = 3;
         this.reconnectInterval = 5000; // 5 seconds
         this.heartbeatTimeout = 90000; // 90 seconds
-        this.baseUrl = 'https://orgfarm-e0ea23d84f-dev-ed.develop.my.salesforce-scrt.com';
-        this.orgId = '00DKB000000L0ba'; // Add orgId as a property
+        this.baseUrl = 'https://accenture-1c1--genaidev2.sandbox.my.salesforce-scrt.com';
+        this.orgId = '00DDw000005FDSw'; // Add orgId as a property
         this.isPolyfillLoaded = false;
     }
 
