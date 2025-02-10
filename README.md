@@ -12,11 +12,17 @@
 
 Before installing this package, ensure you have:
 
--   A Salesforce org with AgentForce enabled
+-   A Salesforce org with the following features enabled:
+    -   Einstein 1 AI Platform
+    -   Live Agent
+    -   Live Message
+    -   Lightning Service Console
+    -   AgentForce
+-   Omni-Channel routing enabled and configured for message session routing
+-   Einstein GPT Platform enabled in your org settings
 -   Prompt Builder permission sets assigned to users who will be using this feature
 -   Salesforce CLI installed on your machine
 -   OpenAI API key for audio transcription and text-to-speech features
--   Omni-Channel routing enabled and configured for message session routing
 -   SCRT URL for your embedded service deployment
 
 ## Installation 🚀
