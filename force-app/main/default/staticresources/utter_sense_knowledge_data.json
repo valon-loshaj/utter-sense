@@ -1,0 +1,124 @@
+{
+    "records": [
+        {
+            "attributes": {
+                "type": "Knowledge__kav"
+            },
+            "Title": "What is Otera and how does it work?",
+            "Summary": "Overview of Otera, NewCo's prescription weight management medication, its mechanism of action, and intended use",
+            "Question": "What is Otera and how does it work to help with weight management?",
+            "Answer": "Otera is a prescription medication manufactured by NewCo for chronic weight management in adults with obesity (BMI ≥30) or overweight (BMI ≥27) with at least one weight-related condition. It works by targeting specific receptors in the brain that regulate appetite and food intake, helping you feel fuller for longer periods. Unlike GLP-1 receptor agonists like Wegovy or Saxenda, Otera uses a novel dual-mechanism approach that combines appetite suppression with enhanced metabolic rate. It comes in once-daily oral tablet form, making it more convenient than injectable alternatives. Otera should be used along with a reduced-calorie diet and increased physical activity for optimal results.",
+            "Language": "en_US",
+            "PublishStatus": "Draft",
+            "UrlName": "what-is-otera-and-how-does-it-work"
+        },
+        {
+            "attributes": {
+                "type": "Knowledge__kav"
+            },
+            "Title": "Otera Dosing Schedule and Administration",
+            "Summary": "Information about proper dosing, timing, and administration of Otera tablets",
+            "Question": "How should I take Otera and what is the recommended dosing schedule?",
+            "Answer": "Otera should be taken once daily, preferably in the morning, with or without food. The recommended starting dose is 10mg daily for the first month. If well-tolerated, your healthcare provider may increase the dose to 20mg daily for enhanced effectiveness. Unlike some other obesity medications that require weekly injections, Otera comes as an oral tablet that can be taken at home. If you miss a dose, take it as soon as you remember unless it's close to your next scheduled dose. Never take a double dose to make up for a missed one. Always follow your healthcare provider's specific instructions, as they may adjust your dosing based on your individual response and tolerance.",
+            "Language": "en_US",
+            "PublishStatus": "Draft",
+            "UrlName": "otera-dosing-schedule-and-administration"
+        },
+        {
+            "attributes": {
+                "type": "Knowledge__kav"
+            },
+            "Title": "Common Side Effects of Otera",
+            "Summary": "Description of common side effects reported with Otera use",
+            "Question": "What are the common side effects I might experience while taking Otera?",
+            "Answer": "Like all medications, Otera may cause side effects, though not everyone experiences them. The most common side effects include: mild nausea (typically improving over time), constipation, headache, and mild fatigue. These effects are generally less severe than those reported with injectable GLP-1 medications like Wegovy or Saxenda. Most side effects are mild to moderate and occur during the first few weeks of treatment as your body adjusts to the medication. Taking Otera in the morning and staying well-hydrated can help minimize these effects. Contact your healthcare provider if side effects persist or become bothersome, as they may recommend dose adjustments or management strategies.",
+            "Language": "en_US",
+            "PublishStatus": "Draft",
+            "UrlName": "common-side-effects-of-otera"
+        },
+        {
+            "attributes": {
+                "type": "Knowledge__kav"
+            },
+            "Title": "Drug Interactions with Otera",
+            "Summary": "Important information about potential drug interactions with Otera",
+            "Question": "What medications might interact with Otera, and should I avoid any specific drugs while taking it?",
+            "Answer": "While Otera has fewer drug interactions compared to some other weight management medications like Qsymia, there are still important interactions to be aware of. Tell your healthcare provider about all medications you take, including prescription, over-the-counter medicines, and supplements. Particular attention should be paid to: diabetes medications (as dose adjustments may be needed), medications metabolized by CYP3A4 enzymes, and certain antidepressants. Unlike Saxenda or Wegovy, Otera can be taken with most blood pressure medications without dose adjustment. However, always consult your healthcare provider before starting any new medication while on Otera.",
+            "Language": "en_US",
+            "PublishStatus": "Draft",
+            "UrlName": "drug-interactions-with-otera"
+        },
+        {
+            "attributes": {
+                "type": "Knowledge__kav"
+            },
+            "Title": "Expected Weight Loss Results with Otera",
+            "Summary": "Information about typical weight loss results and timeframes with Otera treatment",
+            "Question": "How much weight can I expect to lose with Otera, and how quickly will I see results?",
+            "Answer": "Clinical trials have shown that patients taking Otera, when combined with lifestyle changes, typically lose 5-7% of their initial body weight within the first 3 months, and 10-15% after 12 months of treatment. While these results may be slightly lower than those seen with injectable GLP-1 medications like Wegovy, Otera offers the convenience of oral administration and fewer gastrointestinal side effects. Individual results vary, and optimal results are achieved when Otera is used in combination with a reduced-calorie diet and regular physical activity. It's important to have realistic expectations and understand that sustainable weight loss is typically gradual, averaging 1-2 pounds per week.",
+            "Language": "en_US",
+            "PublishStatus": "Draft",
+            "UrlName": "expected-weight-loss-results-with-otera"
+        },
+        {
+            "attributes": {
+                "type": "Knowledge__kav"
+            },
+            "Title": "Pregnancy and Otera Use",
+            "Summary": "Guidance regarding Otera use during pregnancy and breastfeeding",
+            "Question": "Is it safe to take Otera during pregnancy or while breastfeeding?",
+            "Answer": "Otera should not be used during pregnancy or while breastfeeding. If you become pregnant or suspect pregnancy while taking Otera, discontinue use immediately and contact your healthcare provider. Like other weight management medications such as Wegovy and Qsymia, Otera has not been studied in pregnant women, and its effects on fetal development are unknown. Women of childbearing potential should use effective contraception while taking Otera. If you're planning to become pregnant, discuss with your healthcare provider about discontinuing Otera at least 2 months before attempting to conceive. The presence of Otera in breast milk and its effects on breastfed infants have not been studied, so breastfeeding is not recommended while taking this medication.",
+            "Language": "en_US",
+            "PublishStatus": "Draft",
+            "UrlName": "pregnancy-and-otera-use"
+        },
+        {
+            "attributes": {
+                "type": "Knowledge__kav"
+            },
+            "Title": "Insurance Coverage and Cost of Otera",
+            "Summary": "Information about insurance coverage, prior authorization, and patient assistance programs for Otera",
+            "Question": "Is Otera covered by insurance, and what assistance programs are available?",
+            "Answer": "Coverage for Otera varies by insurance plan. Many commercial insurance plans cover Otera with prior authorization, similar to coverage for other weight management medications like Wegovy or Saxenda. To obtain coverage, your healthcare provider typically needs to document: your BMI, previous weight loss attempts, and any weight-related health conditions. NewCo offers several patient assistance programs: a savings card that can reduce commercial insurance copays to as little as $25/month for eligible patients, a patient assistance program for uninsured patients meeting income requirements, and a bridge program providing free medication if insurance approval is delayed. Contact NewCo's patient support program or visit their website for detailed information about these programs.",
+            "Language": "en_US",
+            "PublishStatus": "Draft",
+            "UrlName": "insurance-coverage-and-cost-of-otera"
+        },
+        {
+            "attributes": {
+                "type": "Knowledge__kav"
+            },
+            "Title": "Long-term Use of Otera",
+            "Summary": "Information about long-term treatment with Otera and what happens after discontinuation",
+            "Question": "How long can I take Otera, and what happens when I stop taking it?",
+            "Answer": "Otera is approved for long-term use in chronic weight management, similar to other medications like Wegovy and Saxenda. Obesity is considered a chronic condition requiring ongoing management. If you respond well to Otera (losing at least 5% of initial weight within 3-6 months) and don't experience significant side effects, your healthcare provider may recommend continuing treatment indefinitely. Like other weight management medications, some weight regain may occur if Otera is discontinued. This is why it's important to establish sustainable lifestyle changes while on the medication. If you need to stop Otera, work with your healthcare provider to develop a plan for maintaining your weight loss through diet and exercise.",
+            "Language": "en_US",
+            "PublishStatus": "Draft",
+            "UrlName": "long-term-use-of-otera"
+        },
+        {
+            "attributes": {
+                "type": "Knowledge__kav"
+            },
+            "Title": "Otera and Diabetes Management",
+            "Summary": "Information about using Otera in patients with type 2 diabetes",
+            "Question": "Can I take Otera if I have type 2 diabetes, and how might it affect my blood sugar?",
+            "Answer": "Otera can be used by patients with type 2 diabetes, and clinical trials have shown it may help improve blood sugar control in addition to supporting weight loss. However, unlike GLP-1 medications such as Wegovy or Ozempic, Otera's primary mechanism of action is not directly related to blood sugar regulation. If you have diabetes and start Otera, your healthcare provider may need to adjust your diabetes medications to prevent low blood sugar (hypoglycemia). Regular blood sugar monitoring is recommended, especially during the first few months of treatment. Always inform your diabetes care team that you are taking Otera, as they may need to adjust your diabetes management plan accordingly.",
+            "Language": "en_US",
+            "PublishStatus": "Draft",
+            "UrlName": "otera-and-diabetes-management"
+        },
+        {
+            "attributes": {
+                "type": "Knowledge__kav"
+            },
+            "Title": "Dietary Restrictions with Otera",
+            "Summary": "Guidance on dietary considerations and restrictions while taking Otera",
+            "Question": "Are there any foods I should avoid while taking Otera, and do I need to follow a specific diet?",
+            "Answer": "While taking Otera, there are no specific foods you must absolutely avoid, which is different from some other weight management medications that may have dietary restrictions. However, for optimal results, it's recommended to follow a reduced-calorie, balanced diet as prescribed by your healthcare provider or registered dietitian. Unlike Qsymia, which requires avoiding alcohol, Otera has no specific alcohol restrictions, though moderate consumption is advised. To minimize mild nausea that some patients experience, you may find it helpful to avoid very large or high-fat meals. Focus on eating regular, balanced meals with adequate protein, and stay well-hydrated by drinking plenty of water throughout the day.",
+            "Language": "en_US",
+            "PublishStatus": "Draft",
+            "UrlName": "dietary-restrictions-with-otera"
+        }
+    ]
+}
