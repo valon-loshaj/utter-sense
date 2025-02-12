@@ -6,6 +6,7 @@
 	</types>
 	<types>
 		<members>eventSourcePolyfill</members>
+		<members>utter_sense_knowledge_data</members>
 		<name>StaticResource</name>
 	</types>
 	<types>
