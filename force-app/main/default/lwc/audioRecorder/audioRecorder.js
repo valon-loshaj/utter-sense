@@ -446,11 +446,53 @@ export default class AudioRecorder extends LightningElement {
                 this.currentTranscription = null;
             }
 
-            // If it's an agent message, clear typing indicator for that agent
-            if (isAgentMessage && messageData.data?.conversationEntry?.senderDisplayName) {
-                const agentName = messageData.data.conversationEntry.senderDisplayName;
-                this.typingParticipants = this.typingParticipants.filter((p) => p.name !== agentName);
-                this.isAnotherParticipantTyping = this.typingParticipants.length > 0;
+            // If it's an agent message, remove the typing indicator for that agent
+            if (isAgentMessage) {
+                const agentName = messageData.data?.conversationEntry?.senderDisplayName;
+                console.log('[AudioRecorder] Agent message received from:', agentName);
+                console.log(
+                    '[AudioRecorder] Current typing participants:',
+                    JSON.stringify(this.typingParticipants, null, 2)
+                );
+
+                if (agentName) {
+                    // Remove the typing participant
+                    const previousLength = this.typingParticipants.length;
+                    this.typingParticipants = this.typingParticipants.filter((p) => {
+                        const shouldKeep = p.name !== agentName;
+                        if (!shouldKeep) {
+                            console.log('[AudioRecorder] Removing typing indicator for:', p.name);
+                        }
+                        return shouldKeep;
+                    });
+                    console.log(
+                        '[AudioRecorder] Typing participants after removal:',
+                        JSON.stringify(this.typingParticipants, null, 2)
+                    );
+
+                    // Update typing indicator visibility
+                    this.isAnotherParticipantTyping = this.typingParticipants.length > 0;
+                    console.log(
+                        '[AudioRecorder] Updated typing indicator visibility:',
+                        this.isAnotherParticipantTyping
+                    );
+
+                    // Clear any existing timeout for this agent
+                    if (this._typingDebounceTimers?.has(agentName)) {
+                        clearTimeout(this._typingDebounceTimers.get(agentName));
+                        this._typingDebounceTimers.delete(agentName);
+                    }
+
+                    // Force a re-render if needed
+                    if (previousLength !== this.typingParticipants.length) {
+                        this.template.querySelector('.typing-indicator')?.classList.remove('visible');
+                        requestAnimationFrame(() => {
+                            if (this.isAnotherParticipantTyping) {
+                                this.template.querySelector('.typing-indicator')?.classList.add('visible');
+                            }
+                        });
+                    }
+                }
             }
 
             // Structure the message data
@@ -525,16 +567,11 @@ export default class AudioRecorder extends LightningElement {
     }
 
     handleTypingIndicator(messageData) {
-        console.log('[AudioRecorder] Handling typing indicator:', messageData);
+        console.log('[AudioRecorder] Handling typing indicator:', JSON.stringify(messageData, null, 2));
         const { actor, type } = messageData;
         if (!actor || !actor.actorName) {
             console.warn('[AudioRecorder] Missing actor information in typing indicator event');
             return;
-        }
-
-        // Clear any existing debounce timeout for this actor
-        if (this._typingDebounceTimers?.get(actor.actorName)) {
-            clearTimeout(this._typingDebounceTimers.get(actor.actorName));
         }
 
         // Initialize the map if it doesn't exist
@@ -544,6 +581,7 @@ export default class AudioRecorder extends LightningElement {
 
         requestAnimationFrame(() => {
             if (type === 'typing_started') {
+                console.log('[AudioRecorder] Adding typing participant:', actor.actorName);
                 // Add to typing participants if not already present
                 if (!this.typingParticipants.some((p) => p.name === actor.actorName)) {
                     this.typingParticipants = [
@@ -554,25 +592,53 @@ export default class AudioRecorder extends LightningElement {
                             timestamp: new Date().toISOString()
                         }
                     ];
+                    console.log(
+                        '[AudioRecorder] Updated typing participants:',
+                        JSON.stringify(this.typingParticipants, null, 2)
+                    );
                 }
 
-                // Set a timeout to automatically clear the typing indicator if no update is received
+                // Clear any existing timeout for this actor
+                if (this._typingDebounceTimers.has(actor.actorName)) {
+                    clearTimeout(this._typingDebounceTimers.get(actor.actorName));
+                    this._typingDebounceTimers.delete(actor.actorName);
+                }
+
+                // Add a safety timeout to clear the indicator after 30 seconds
                 this._typingDebounceTimers.set(
                     actor.actorName,
                     setTimeout(() => {
+                        console.log('[AudioRecorder] Safety timeout clearing typing indicator for:', actor.actorName);
                         this.typingParticipants = this.typingParticipants.filter((p) => p.name !== actor.actorName);
                         this.isAnotherParticipantTyping = this.typingParticipants.length > 0;
                         this._typingDebounceTimers.delete(actor.actorName);
-                    }, 3000) // Clear after 3 seconds of no updates
+                    }, 30000) // Clear after 30 seconds as a safety measure
                 );
-            } else {
-                // Remove from typing participants
-                this.typingParticipants = this.typingParticipants.filter((p) => p.name !== actor.actorName);
-                this._typingDebounceTimers.delete(actor.actorName);
+            } else if (type === 'typing_stopped') {
+                console.log('[AudioRecorder] Typing stopped for:', actor.actorName);
+                // We'll still keep the indicator visible, but start a short timeout
+                if (this._typingDebounceTimers.has(actor.actorName)) {
+                    clearTimeout(this._typingDebounceTimers.get(actor.actorName));
+                }
+
+                // Set a shorter timeout for typing_stopped
+                this._typingDebounceTimers.set(
+                    actor.actorName,
+                    setTimeout(() => {
+                        console.log(
+                            '[AudioRecorder] Removing typing indicator after stop timeout for:',
+                            actor.actorName
+                        );
+                        this.typingParticipants = this.typingParticipants.filter((p) => p.name !== actor.actorName);
+                        this.isAnotherParticipantTyping = this.typingParticipants.length > 0;
+                        this._typingDebounceTimers.delete(actor.actorName);
+                    }, 5000) // Clear after 5 seconds if no message is received
+                );
             }
 
             // Update the typing indicator visibility
             this.isAnotherParticipantTyping = this.typingParticipants.length > 0;
+            console.log('[AudioRecorder] Typing indicator visibility:', this.isAnotherParticipantTyping);
 
             // If typing started, scroll to the typing indicator
             if (this.isAnotherParticipantTyping) {
